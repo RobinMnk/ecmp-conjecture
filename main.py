@@ -4,7 +4,7 @@ from optimal_solver import calculate_optimal_solution
 if __name__ == '__main__':
     random.seed(31415926535)
 
-    inst = build_random_DAG(10, 0.5)
+    inst = build_random_DAG(5, 0.7)
 
     solution = calculate_optimal_solution(inst)
 
@@ -12,6 +12,6 @@ if __name__ == '__main__':
         print("Error in computing optimal solution")
         exit(1)
 
-    show_graph(inst, solution)
+    show_graph(inst, solution.dag)
 
 

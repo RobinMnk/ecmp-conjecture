@@ -5,6 +5,7 @@ import graphviz
 
 DAG = namedtuple("DAG", "num_nodes, neighbors")
 Instance = namedtuple("Instance", "dag, sources, target")
+Solution = namedtuple("Solution", "dag, opt_congestion")
 
 
 def build_random_DAG(num_nodes, prob_edge):
@@ -28,8 +29,11 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
         dot.node(str(node), str(node), color="blue" if node in instance.sources else "black")
 
         for nb in instance.dag.neighbors[node]:
-            edge_color = "green" if nb in solution.neighbors[node] else "black"
-            dot.edge(str(node), str(nb), color=edge_color)
+            sol_val = solution.neighbors[node]
+            part_of_solution = nb in sol_val
+            edge_color = "green" if part_of_solution else "black"
+            label = f"{sol_val[nb]:.2f}" if part_of_solution else None
+            dot.edge(str(node), str(nb), color=edge_color, label=label)
 
     return dot.source
 

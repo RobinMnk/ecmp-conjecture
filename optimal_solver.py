@@ -24,11 +24,12 @@ def generate_all_paths(G: DAG, source: int, target: int, edge_dict: dict):
     yield from _rec_generate_all_paths(G, source, target, visited, edge_dict, [source])
 
 
-def add_path_to_DAG(dag: DAG, path: str):
-    nodes = path[5:].split("-")
+def add_path_to_DAG(dag: DAG, path: str, val: float):
+    nodes = list(map(int, path[5:].split("-")))
     for i in range(len(nodes) - 1):
-        node_id = int(nodes[i])
-        dag.neighbors[node_id].append(int(nodes[i+1]))
+        from_id = nodes[i]
+        to_id = nodes[i+1]
+        dag.neighbors[from_id][to_id] += val
 
 
 def calculate_optimal_solution(instance: Instance):
@@ -69,15 +70,15 @@ def calculate_optimal_solution(instance: Instance):
         m.optimize()
 
         """ Output solution """
-        solution = DAG(dag.num_nodes, defaultdict(list))
+        solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
         for v in m.getVars():
             if v.VarName != "cong" and v.X > 0:
-                add_path_to_DAG(solution, v.VarName)
+                add_path_to_DAG(solution, v.VarName, v.X)
                 print('%s %g' % (v.VarName, v.X))
 
         print('Obj: %g' % m.ObjVal)
 
-        return solution
+        return Solution(solution, m.ObjVal)
 
     except gp.GurobiError as e:
         print('Error code ' + str(e.message) + ': ' + str(e))
