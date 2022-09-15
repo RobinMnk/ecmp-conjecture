@@ -20,7 +20,7 @@ def _rec_generate_all_paths(G: DAG, node: int, target: int, visited: list, edge_
 
 
 def generate_all_paths(G: DAG, source: int, target: int, edge_dict: dict):
-    visited = [False for _ in range(G.num_nodes)]
+    visited = [False] * G.num_nodes
     yield from _rec_generate_all_paths(G, source, target, visited, edge_dict, [source])
 
 
@@ -74,9 +74,8 @@ def calculate_optimal_solution(instance: Instance):
         for v in m.getVars():
             if v.VarName != "cong" and v.X > 0:
                 add_path_to_DAG(solution, v.VarName, v.X)
-                print('%s %g' % (v.VarName, v.X))
 
-        print('Obj: %g' % m.ObjVal)
+        print('Optimal Congestion: %g' % m.ObjVal)
 
         return Solution(solution, m.ObjVal)
 

@@ -32,13 +32,13 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
             sol_val = solution.neighbors[node]
             part_of_solution = nb in sol_val
             edge_color = "green" if part_of_solution else "black"
-            label = f"{sol_val[nb]:.2f}" if part_of_solution else None
+            label = f"{sol_val[nb]:.2f}".rstrip("0").rstrip(".") if part_of_solution else None
             dot.edge(str(node), str(nb), color=edge_color, label=label)
 
     return dot.source
 
 
-def show_graph(instance: Instance, solution: DAG = None):
+def show_graph(instance: Instance, name: str, solution: DAG = None):
     dot_source = instance_to_dot(instance, solution)
-    s = graphviz.Source(dot_source, filename="graph/output", format="svg")
+    s = graphviz.Source(dot_source, filename=f"graph/{name}", format="svg")
     s.render(engine="circo")
