@@ -1,4 +1,4 @@
-from main import *
+from model import *
 
 import gurobipy as gp
 from gurobipy import GRB
@@ -22,6 +22,13 @@ def _rec_generate_all_paths(G: DAG, node: int, target: int, visited: list, edge_
 def generate_all_paths(G: DAG, source: int, target: int, edge_dict: dict):
     visited = [False for _ in range(G.num_nodes)]
     yield from _rec_generate_all_paths(G, source, target, visited, edge_dict, [source])
+
+
+def add_path_to_DAG(dag: DAG, path: str):
+    nodes = path[5:].split("-")
+    for i in range(len(nodes) - 1):
+        node_id = int(nodes[i])
+        dag.neighbors[node_id].append(int(nodes[i+1]))
 
 
 def calculate_optimal_solution(instance: Instance):
@@ -62,22 +69,20 @@ def calculate_optimal_solution(instance: Instance):
         m.optimize()
 
         """ Output solution """
+        solution = DAG(dag.num_nodes, defaultdict(list))
         for v in m.getVars():
-            print('%s %g' % (v.VarName, v.X))
+            if v.VarName != "cong" and v.X > 0:
+                add_path_to_DAG(solution, v.VarName)
+                print('%s %g' % (v.VarName, v.X))
 
         print('Obj: %g' % m.ObjVal)
 
+        return solution
+
     except gp.GurobiError as e:
-        print('Error code ' + str(e.errno) + ': ' + str(e))
+        print('Error code ' + str(e.message) + ': ' + str(e))
 
     except AttributeError:
         print('Encountered an attribute error')
 
-
-if __name__ == '__main__':
-    random.seed(31415926535)
-
-    inst = build_random_DAG(10, 0.4)
-    instance_to_dot(inst)
-
-    calculate_optimal_solution(inst)
+    return None
