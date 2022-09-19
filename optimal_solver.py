@@ -8,7 +8,7 @@ def _rec_generate_all_paths(G: DAG, node: int, target: int, visited: list, edge_
     if node == target:
         pathname = f"path:{'-'.join(map(lambda x: str(x), path))}"
         for i in range(len(path) - 1):
-            edge = tuple([path[i], path[i+1]])
+            edge = tuple([path[i], path[i + 1]])
             edge_dict[edge].append(pathname)
         yield pathname
     else:
@@ -24,12 +24,74 @@ def generate_all_paths(G: DAG, source: int, target: int, edge_dict: dict):
     yield from _rec_generate_all_paths(G, source, target, visited, edge_dict, [source])
 
 
+def _rec_find_cycles(G: DAG, node, visited, cycle):
+    visited[node] = True
+    cycle.append(node)
+
+    for nb in G.neighbors[node]:
+        if not visited[nb]:
+            return _rec_find_cycles(G, nb, visited, cycle)
+        elif nb in cycle:
+            return cycle[cycle.index(nb):]
+
+    cycle.remove(node)
+    return None
+
+
+def _remove_cycle(G: DAG, cycle):
+    val = G.num_nodes
+    for i in range(len(cycle)):
+        from_id = cycle[i]
+        to_id = cycle[(i + 1) % len(cycle)]
+        if to_id not in G.neighbors[from_id]:
+            return
+        val = min(val, G.neighbors[from_id][to_id])
+
+    for i in range(len(cycle)):
+        from_id = cycle[i]
+        to_id = cycle[(i + 1) % len(cycle)]
+        G.neighbors[from_id][to_id] -= val
+        if G.neighbors[from_id][to_id] == 0:
+            del G.neighbors[from_id][to_id]
+
+
+def remove_cycles(G: DAG):
+    cycle_found = True
+    count = 0
+    while cycle_found:
+        visited = [False] * G.num_nodes
+        cycle_found = False
+        for node in range(G.num_nodes):
+            if not visited[node]:
+                cycle = _rec_find_cycles(G, node, visited, [])
+                if cycle is not None:
+                    print(cycle)
+                    _remove_cycle(G, cycle)
+                    cycle_found = True
+
+        count += 1
+        if count > 100:
+            return False
+
+    return True
+
+
 def add_path_to_DAG(dag: DAG, path: str, val: float):
     nodes = list(map(int, path[5:].split("-")))
     for i in range(len(nodes) - 1):
         from_id = nodes[i]
-        to_id = nodes[i+1]
-        dag.neighbors[from_id][to_id] += val
+        to_id = nodes[i + 1]
+
+        if from_id in dag.neighbors[to_id]:
+            # dag already has back edge
+            back_edge = dag.neighbors[to_id][from_id]
+            if val >= back_edge:
+                del dag.neighbors[to_id][from_id]
+                dag.neighbors[from_id][to_id] += val - back_edge
+            else:
+                dag.neighbors[to_id][from_id] -= val
+        else:
+            dag.neighbors[from_id][to_id] += val
 
 
 def calculate_optimal_solution(instance: Instance):
@@ -71,13 +133,18 @@ def calculate_optimal_solution(instance: Instance):
 
         """ Output solution """
         solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
+        opt_cong = -1
         for v in m.getVars():
-            if v.VarName != "cong" and v.X > 0:
-                add_path_to_DAG(solution, v.VarName, v.X)
+            if v.VarName != "cong":
+                if v.X > 0:
+                    add_path_to_DAG(solution, v.VarName, v.X)
+            else:
+                print('Optimal Congestion: %g' % v.X)
+                opt_cong = v.X
 
-        print('Optimal Congestion: %g' % m.ObjVal)
+        m.dispose()
 
-        return Solution(solution, m.ObjVal)
+        return Solution(solution, opt_cong)
 
     except gp.GurobiError as e:
         print('Error code ' + str(e.message) + ': ' + str(e))
