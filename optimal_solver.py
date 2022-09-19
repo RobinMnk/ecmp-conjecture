@@ -65,7 +65,6 @@ def remove_cycles(G: DAG):
             if not visited[node]:
                 cycle = _rec_find_cycles(G, node, visited, [])
                 if cycle is not None:
-                    print(cycle)
                     _remove_cycle(G, cycle)
                     cycle_found = True
 
@@ -100,8 +99,10 @@ def calculate_optimal_solution(instance: Instance):
     target = instance.target
 
     try:
+        print("..Setup Model")
         # Create a new model
         m = gp.Model("ecmp_opt")
+        m.setParam("OutputFlag", 0)
 
         """ Add Variables """
         # Congestion variable
@@ -129,12 +130,14 @@ def calculate_optimal_solution(instance: Instance):
             m.addConstr(sum([m.getVarByName(f"{name}") for name in v]) <= cong, name=f"edge:{k}")
 
         """ Optimize """
+        print("..Solve")
         m.optimize()
 
         if m.status == GRB.INFEASIBLE:
             return None
 
         """ Output solution """
+        print("..Construct Solution")
         solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
         opt_cong = m.ObjVal
         for v in m.getVars():
@@ -149,7 +152,7 @@ def calculate_optimal_solution(instance: Instance):
     except gp.GurobiError as e:
         print('Error code ' + str(e.message) + ': ' + str(e))
 
-    except AttributeError:
-        print('Encountered an attribute error')
+    # except AttributeError:
+    #     print('Encountered an attribute error')
 
     return None
