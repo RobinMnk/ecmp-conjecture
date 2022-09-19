@@ -5,14 +5,62 @@ from model import *
 from optimal_solver import calculate_optimal_solution, remove_cycles
 from ecmp import get_ecmp_congestion, get_ecmp_DAG, iterate_sub_DAG
 
+def verify_instance(inst: Instance, index: int):
+    print("Calculating optimal solution")
+    solution = calculate_optimal_solution(inst)
+
+    if solution is None:
+        print("Instance has no solution")
+        return True
+
+    if not remove_cycles(solution.dag):
+        with open(f"graph/errors/graph{index}.pickle", "wb") as f:
+            pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
+        with open(f"graph/errors/graph{index}.txt", "w") as f:
+            f.write("Could not remove all cycles!")
+        return False
+
+    print("Calculating ECMP solution")
+    ecmp_cong = get_ecmp_congestion(solution.dag, inst.sources)
+
+    if ecmp_cong < 2 * solution.opt_congestion:
+        # Success
+        return True
+    else:
+        for sub_dag in iterate_sub_DAG(solution.dag):
+            ecmp_cong = get_ecmp_congestion(sub_dag, inst.sources)
+            if ecmp_cong < 2 * solution.opt_congestion:
+                # Success on sub-DAG
+                return True
+
+    # FAIL
+    return False
+
+
+def test_suite(num_tests=100):
+    success = True
+    for i in range(num_tests):
+        seed = int(time.time()) + 4132 * i
+        random.seed(seed)
+        size = random.randint(4, 10)
+        prob = random.randint(1, 32)
+        print("\n--------------------------------------------------------------")
+        print(f"Iteration {i}: Building Instance on {size} nodes with edge probability 1 / {prob}")
+        inst = build_random_DAG(size, 1 / prob)
+        success &= verify_instance(inst, i)
+
+    print("\n\n\n--------------------------------------------------------------")
+    print(f"{success=}")
+
+
 
 def test_random():
     max_factor = 0
     for i in range(500):
         seed = int(time.time()) + 4132 * i
         random.seed(seed)
-        size = 9 #  random.randint(4, 10)
-        prob = 1 # random.randint(1, 32)
+        size = random.randint(4, 10)
+        prob = random.randint(1, 32)
 
         print("\n--------------------------------------------------------------")
         print(f"Iteration {i}: Building Instance on {size} nodes with edge probability 1 / {prob}")
@@ -65,8 +113,10 @@ def test_random():
 
 if __name__ == '__main__':
 
-    # test_random()
-    # exit(0)
+    test_random()
+
+    # test_suite(200)
+    exit(0)
 
     graph_index = 4
     with open(f"graph/graph{graph_index}.pickle", "rb") as f:
