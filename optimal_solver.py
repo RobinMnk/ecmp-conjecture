@@ -131,16 +131,16 @@ def calculate_optimal_solution(instance: Instance):
         """ Optimize """
         m.optimize()
 
+        if m.status == GRB.INFEASIBLE:
+            return None
+
         """ Output solution """
         solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
-        opt_cong = -1
+        opt_cong = m.ObjVal
         for v in m.getVars():
             if v.VarName != "cong":
                 if v.X > 0:
                     add_path_to_DAG(solution, v.VarName, v.X)
-            else:
-                print('Optimal Congestion: %g' % v.X)
-                opt_cong = v.X
 
         m.dispose()
 

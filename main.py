@@ -10,7 +10,6 @@ def verify_instance(inst: Instance, index: int):
     solution = calculate_optimal_solution(inst)
 
     if solution is None:
-        print("Instance has no solution")
         return True
 
     if not remove_cycles(solution.dag):
@@ -50,7 +49,7 @@ def test_suite(num_tests=100):
         success &= verify_instance(inst, i)
 
     print("\n\n\n--------------------------------------------------------------")
-    print(f"{success=}")
+    print(f"{success = }")
 
 
 
@@ -113,9 +112,9 @@ def test_random():
 
 if __name__ == '__main__':
 
-    test_random()
+    # test_random()
 
-    # test_suite(200)
+    test_suite(200)
     exit(0)
 
     graph_index = 4
