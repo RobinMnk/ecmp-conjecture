@@ -8,7 +8,7 @@ def _rec_generate_all_paths(G: DAG, node: int, target: int, visited: list, edge_
     if node == target:
         pathname = f"path:{'-'.join(map(lambda x: str(x), path))}"
         for i in range(len(path) - 1):
-            edge = tuple([path[i], path[i + 1]])
+            edge = (path[i], path[i + 1])
             edge_dict[edge].append(pathname)
         yield pathname
     else:

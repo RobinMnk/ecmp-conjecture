@@ -3,7 +3,7 @@ import pickle
 
 from model import *
 from optimal_solver import calculate_optimal_solution, remove_cycles
-from ecmp import get_ecmp_congestion
+from ecmp import get_ecmp_congestion, get_ecmp_DAG, iterate_sub_DAG
 
 
 def test_random():
@@ -78,5 +78,23 @@ if __name__ == '__main__':
 
         trimmed_inst = Instance(solution.dag, inst.sources, inst.target)
         show_graph(trimmed_inst, "_after", solution.dag)
+
+        print("Calculating ECMP solution")
+        ecmp_cong, ecmp_dag = get_ecmp_DAG(solution.dag, inst.sources)
+        print(f"ECMP Congestion: {ecmp_cong}")
+
+        factor = ecmp_cong / solution.opt_congestion
+        print(f"Factor: {factor}")
+
+        show_graph(trimmed_inst, "_with_ecmp", ecmp_dag)
+
+        min_cong = ecmp_cong
+        for sub_dag in iterate_sub_DAG(solution.dag):
+            ecmp_cong = get_ecmp_congestion(sub_dag, inst.sources)
+            print(f"ECMP Congestion: {ecmp_cong}")
+            min_cong = min(min_cong, ecmp_cong)
+
+        print(f"\n\nBest ECMP Congestion:  {min_cong}")
+
 
 
