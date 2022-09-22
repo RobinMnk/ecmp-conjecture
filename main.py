@@ -1,18 +1,26 @@
+import multiprocessing
 import time
 import pickle
 import os
+import logging
+from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution, remove_cycles
 from ecmp import get_ecmp_congestion, get_ecmp_DAG, iterate_sub_DAG
 
 
+def get_logger():
+    return logging.getLogger(multiprocessing.current_process().name + '_worker')
+
+
 def verify_instance(inst: Instance, index: int):
-    print("Calculating optimal solution")
+    logger = get_logger()
+    logger.info("Calculating optimal solution")
     solution = calculate_optimal_solution(inst)
 
     if solution is None:
-        print("-> Infeasible Model!")
+        logger.info("-> Infeasible Model!")
         return True
 
     if not remove_cycles(solution.dag):
@@ -22,45 +30,75 @@ def verify_instance(inst: Instance, index: int):
             f.write("Could not remove all cycles!")
         return False
 
-    print("Calculating ECMP solution")
+    logger.info("Calculating ECMP solution")
     ecmp_cong = get_ecmp_congestion(solution.dag, inst.sources)
 
     if ecmp_cong < 2 * solution.opt_congestion:
-        print("-> Success")
+        logger.info("-> Success")
         return True
     else:
-        print("..Iterate all sub-DAGs")
+        logger.info("..Iterate all sub-DAGs")
         for sub_dag in iterate_sub_DAG(solution.dag):
             ecmp_cong = get_ecmp_congestion(sub_dag, inst.sources)
             if ecmp_cong < 2 * solution.opt_congestion:
                 # Success on sub-DAG
-                print("-> Success")
+                logger.info("-> Success")
                 return True
 
     # FAIL
-    print("\n" * 3 + "=" * 40 + "\n\t!!! COUNTEREXAMPLE FOUND !!!")
+    logger.error("")
+    logger.error("=" * 40)
+    logger.error(" " * 10 + "COUNTEREXAMPLE FOUND!!" + " " * 10)
+    logger.error("=" * 40)
     os.makedirs("graph/counterexamples", exist_ok=True)
     with open(f"graph/counterexamples/graph{index}.pickle", "wb") as f:
         pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
         show_graph(inst, f"counterexamples/ex_{index}", solution.dag)
 
+    print("=" * 40)
+    print(" " * 10 + "COUNTEREXAMPLE FOUND!!" + " " * 10)
+    print("=" * 40)
+
     return False
 
 
+def setup_logger():
+    fh = logging.FileHandler('graph//logs/' + multiprocessing.current_process().name + '_worker.log')
+    fmt = logging.Formatter('%(asctime)-6s: %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(fmt)
+    local_logger = get_logger()
+    local_logger.addHandler(fh)
+    local_logger.setLevel(logging.DEBUG)
+
+
 def test_suite(num_tests=100):
+    setup_logger()
+    logger = get_logger()
+
+    random_bytes = os.urandom(8)
+    seed = int.from_bytes(random_bytes, byteorder="big")
+    random.seed(seed)
+
     for i in range(num_tests):
-        seed = 543 * int(time.time()) - 4132 * i
-        random.seed(seed)
+        if i % (num_tests / 10) == 0:
+            print(f"{multiprocessing.current_process().name} at Iteration {i}/{num_tests}")
+
         size = random.randint(4, 11)
         prob = random.random() * 0.8
-        print("---------------------------------------------------------------------------")
-        print(f"Iteration {i}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
+        logger.info("-" * 25)
+        logger.info(f"Iteration {i}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
         inst = build_random_DAG(size, prob)
         success = verify_instance(inst, i)
         if not success:
+            logger.error("")
             exit(0)
 
-    print("\n\n\n===========================================================================\n\t SUCESS! ")
+    logger.info("")
+    logger.info("=" * 40)
+    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
+    logger.info("=" * 40)
+
+    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
 
 def inspect_instance(id):
@@ -92,7 +130,19 @@ def inspect_instance(id):
         print(f"\n\nBest ECMP Congestion:  {min_cong}")
 
 
+def run_multiprocessing(num_processes, num_iterations):
+    procs = []
+    for i in range(min(num_processes, 8)):
+        proc = Process(target=test_suite, args=(num_iterations,))
+        procs.append(proc)
+        proc.start()
+
+    for proc in procs:
+        proc.join()
+
+
 if __name__ == '__main__':
-    test_suite(200)
+    # test_suite(200)
+    run_multiprocessing(8, 200)
 
 

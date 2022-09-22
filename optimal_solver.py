@@ -99,7 +99,7 @@ def calculate_optimal_solution(instance: Instance):
     target = instance.target
 
     try:
-        print("..Setup Model")
+        # print("..Setup Model")
         # Create a new model
         m = gp.Model("ecmp_opt")
         m.setParam("OutputFlag", 0)
@@ -130,14 +130,14 @@ def calculate_optimal_solution(instance: Instance):
             m.addConstr(sum([m.getVarByName(f"{name}") for name in v]) <= cong, name=f"edge:{k}")
 
         """ Optimize """
-        print("..Solve")
+        # print("..Solve")
         m.optimize()
 
         if m.status == GRB.INFEASIBLE:
             return None
 
         """ Output solution """
-        print("..Construct Solution")
+        # print("..Construct Solution")
         solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
         opt_cong = m.ObjVal
         for v in m.getVars():
