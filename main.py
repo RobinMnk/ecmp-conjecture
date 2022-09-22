@@ -1,5 +1,6 @@
 import time
 import pickle
+import os
 
 from model import *
 from optimal_solver import calculate_optimal_solution, remove_cycles
@@ -37,11 +38,16 @@ def verify_instance(inst: Instance, index: int):
                 return True
 
     # FAIL
+    print("\n" * 3 + "=" * 40 + "\n\t!!! COUNTEREXAMPLE FOUND !!!")
+    os.makedirs("graph/counterexamples", exist_ok=True)
+    with open(f"graph/counterexamples/graph{index}.pickle", "wb") as f:
+        pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
+        show_graph(inst, f"counterexamples/ex_{index}", solution.dag)
+
     return False
 
 
 def test_suite(num_tests=100):
-    success = True
     for i in range(num_tests):
         seed = 543 * int(time.time()) - 4132 * i
         random.seed(seed)
@@ -50,10 +56,11 @@ def test_suite(num_tests=100):
         print("---------------------------------------------------------------------------")
         print(f"Iteration {i}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
         inst = build_random_DAG(size, prob)
-        success &= verify_instance(inst, i)
+        success = verify_instance(inst, i)
+        if not success:
+            exit(0)
 
-    print("\n\n\n===========================================================================")
-    print(f"{success = }")
+    print("\n\n\n===========================================================================\n\t SUCESS! ")
 
 
 def inspect_instance(id):
