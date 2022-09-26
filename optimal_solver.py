@@ -146,18 +146,20 @@ def calculate_optimal_solution(instance: Instance):
 
         """ Output solution """
         # print("..Construct Solution")
-        solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(float)))
+        solution_dag = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(float)))
         opt_cong = m.ObjVal
         for v in m.getVars():
             if v.VarName != "cong":
                 if v.X > 0:
-                    add_path_to_DAG(solution, v.VarName, v.X)
+                    add_path_to_DAG(solution_dag, v.VarName, v.X)
 
         m.dispose()
 
-        sol_with_cycles = Solution(solution, opt_cong)
+        remove_cycles(solution_dag)
 
-        return remove_cycles(sol_with_cycles)
+        solution = Solution(solution_dag, opt_cong)
+
+        return solution
 
     except gp.GurobiError as e:
         print('Error code ' + str(e.message) + ': ' + str(e))
