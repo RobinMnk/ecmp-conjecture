@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import sys
+import time
 from collections import namedtuple, defaultdict
 
 import random
@@ -102,4 +103,11 @@ def setup_logger(log_to_stdout=False):
     if log_to_stdout:
         local_logger.addHandler(logging.StreamHandler(sys.stdout))
     local_logger.setLevel(logging.DEBUG)
+
+
+def time_execution(function, *parameters):
+    start = time.time()
+    res = function(*parameters)
+    end = time.time()
+    return end - start, res
 

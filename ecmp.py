@@ -66,3 +66,16 @@ def get_optimal_ECMP_sub_DAG(dag: DAG, sources: list[int]) -> ECMP_Sol:
         if result.congestion < best.congestion:
             best = result
     return best
+
+
+def get_ALL_optimal_ECMP_sub_DAGs(dag: DAG, sources: list[int]) -> list[ECMP_Sol]:
+    all_best = []
+    best_congestion = dag.num_nodes
+    for sub_dag in iterate_sub_DAG(dag):
+        result = get_ecmp_DAG(sub_dag, sources)
+        if result.congestion < best_congestion:
+            all_best = [result]
+            best_congestion = result.congestion
+        if result.congestion == best_congestion:
+            all_best.append(result)
+    return all_best

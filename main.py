@@ -4,26 +4,26 @@ from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution
-from ecmp import get_optimal_ECMP_sub_DAG
+from ecmp import get_optimal_ECMP_sub_DAG, get_ALL_optimal_ECMP_sub_DAGs
 from conjectures import check_all_conjectures
 
 
 def verify_instance(inst: Instance, index: int, show_results=False):
     logger = get_logger()
-    logger.info("Calculating optimal solution")
-    solution = calculate_optimal_solution(inst)
+    sol_time, opt_solution = time_execution(calculate_optimal_solution, inst)
+    logger.info(f"Calculated optimal solution{f'   ({sol_time:0.2f}s)' if sol_time > 1 else ''}")
 
-    if solution is None:
+    if opt_solution is None:
         logger.info("-> Infeasible Model!")
         return True
 
     if show_results:
-        show_graph(inst, f"graph_{index}", solution.dag)
+        show_graph(inst, f"graph_{index}", opt_solution.dag)
 
-    logger.info("Calculating ECMP solution")
-    ecmp_sol = get_optimal_ECMP_sub_DAG(solution.dag, inst.sources)
+    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst.sources)
+    logger.info(f"Calculated ECMP solution{f'   ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
-    return check_all_conjectures(solution, ecmp_sol, inst, index)
+    return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
 
 
 def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
@@ -36,13 +36,14 @@ def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
 
     for i in range(num_tests):
         size = random.randint(4, MAX_NUM_NODES)
-        prob = random.random() * 0.8
+        prob = random.random() * 0.7 + 0.1
         logger.info("-" * 72)
         logger.info(f"Iteration {i}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
         inst = build_random_DAG(size, prob)
         success = verify_instance(inst, i, show_results=show_results)
         if not success:
             logger.error("")
+            print(f"!!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
             exit(0)
 
     logger.info("")
