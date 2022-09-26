@@ -89,12 +89,12 @@ def run_multiprocessing(num_processes, num_iterations):
         proc.join()
 
 
-MAX_NUM_NODES = 6
+MAX_NUM_NODES = 10
 
 
 if __name__ == '__main__':
     # inspect_instance(332)
-    test_suite(50)
-    # run_multiprocessing(8, 500)
+    # test_suite(50)
+    run_multiprocessing(4, 200)
 
 

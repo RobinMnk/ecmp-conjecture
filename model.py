@@ -84,12 +84,8 @@ def show_graph(instance: Instance, name: str, solution: DAG = None):
 def compare_node_loads(ecmp_loads, opt_loads, sources):
     for i, (a, b) in enumerate(zip(ecmp_loads, opt_loads)):
         if i in sources and a > 2 * b:
-            print(f"Sub-Assumption Error: Node {i} has ECMP load of {a} and opt load of {b}")
-            print(opt_loads)
-            print(ecmp_loads)
-            return False
-
-    return True
+            return i
+    return None
 
 
 def get_logger():
