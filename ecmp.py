@@ -6,28 +6,7 @@ import copy
 from model import *
 
 
-def topologicalSortUtil(dag: DAG, node: int, visited, stack):
-    visited[node] = True
-
-    for nb in dag.neighbors[node]:
-        if not visited[nb]:
-            topologicalSortUtil(dag, nb, visited, stack)
-
-    stack.append(node)
-
-
-def topologicalSort(dag: DAG):
-    visited = [False] * dag.num_nodes
-    stack = []
-
-    for i in range(dag.num_nodes):
-        if not visited[i]:
-            topologicalSortUtil(dag, i, visited, stack)
-
-    return reversed(stack)
-
-
-def get_ecmp_congestion(dag: DAG, sources) -> float:
+def get_ecmp_congestion(dag: DAG, sources: list[int]) -> float:
     node_val = [1 if i in sources else 0 for i in range(dag.num_nodes)]
 
     congestion = 0
@@ -42,7 +21,7 @@ def get_ecmp_congestion(dag: DAG, sources) -> float:
     return congestion
 
 
-def get_ecmp_DAG(dag: DAG, sources):
+def get_ecmp_DAG(dag: DAG, sources: list[int]) -> ECMP_Sol:
     node_val = [1 if i in sources else 0 for i in range(dag.num_nodes)]
     edges = defaultdict(lambda: defaultdict(int))
 
@@ -56,7 +35,7 @@ def get_ecmp_DAG(dag: DAG, sources):
                 congestion = max(congestion, value)
                 edges[node][nb] += value
 
-    return congestion, DAG(dag.num_nodes, edges)
+    return ECMP_Sol(DAG(dag.num_nodes, edges), congestion, node_val)
 
 
 def _get_removable_edges(dag: DAG):
@@ -80,3 +59,10 @@ def iterate_sub_DAG(dag: DAG):
         yield cp
 
 
+def get_optimal_ECMP_sub_DAG(dag: DAG, sources: list[int]) -> ECMP_Sol:
+    best = ECMP_Sol(None, dag.num_nodes, [])
+    for sub_dag in iterate_sub_DAG(dag):
+        result = get_ecmp_DAG(sub_dag, sources)
+        if result.congestion < best.congestion:
+            best = result
+    return best

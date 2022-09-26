@@ -1,3 +1,5 @@
+import pickle
+
 from model import *
 
 import gurobipy as gp
@@ -30,7 +32,9 @@ def _rec_find_cycles(G: DAG, node, visited, cycle):
 
     for nb in G.neighbors[node]:
         if not visited[nb]:
-            return _rec_find_cycles(G, nb, visited, cycle)
+            c = _rec_find_cycles(G, nb, visited, cycle)
+            if c is not None:
+                return c
         elif nb in cycle:
             return cycle[cycle.index(nb):]
 
@@ -51,28 +55,32 @@ def _remove_cycle(G: DAG, cycle):
         from_id = cycle[i]
         to_id = cycle[(i + 1) % len(cycle)]
         G.neighbors[from_id][to_id] -= val
-        if G.neighbors[from_id][to_id] == 0:
+        if G.neighbors[from_id][to_id] < 1e-15:
             del G.neighbors[from_id][to_id]
 
 
-def remove_cycles(G: DAG):
-    cycle_found = True
+def remove_cycles(graph: DAG):
     count = 0
-    while cycle_found:
-        visited = [False] * G.num_nodes
-        cycle_found = False
-        for node in range(G.num_nodes):
-            if not visited[node]:
-                cycle = _rec_find_cycles(G, node, visited, [])
-                if cycle is not None:
-                    _remove_cycle(G, cycle)
-                    cycle_found = True
 
+    def check_from_all_nodes():
+        visited = [False] * graph.num_nodes
+        for node in range(graph.num_nodes):
+            if not visited[node]:
+                cycle = _rec_find_cycles(graph, node, visited, [])
+                if cycle is not None:
+                    _remove_cycle(graph, cycle)
+                    return True
+        return False
+
+    while check_from_all_nodes():
         count += 1
         if count > 100:
-            return False
+            with open(f"graph/progr_error/graph.pickle", "wb") as f:
+                pickle.dump(graph, f, pickle.HIGHEST_PROTOCOL)
+            with open(f"graph/progr_error/graph.txt", "w") as f:
+                f.write("Could not remove all cycles!")
 
-    return True
+    check_from_all_nodes()
 
 
 def add_path_to_DAG(dag: DAG, path: str, val: float):
@@ -81,16 +89,16 @@ def add_path_to_DAG(dag: DAG, path: str, val: float):
         from_id = nodes[i]
         to_id = nodes[i + 1]
 
-        if from_id in dag.neighbors[to_id]:
-            # dag already has back edge
-            back_edge = dag.neighbors[to_id][from_id]
-            if val >= back_edge:
-                del dag.neighbors[to_id][from_id]
-                dag.neighbors[from_id][to_id] += val - back_edge
-            else:
-                dag.neighbors[to_id][from_id] -= val
-        else:
-            dag.neighbors[from_id][to_id] += val
+        # if from_id in dag.neighbors[to_id]:
+        #     # dag already has back edge
+        #     back_edge = dag.neighbors[to_id][from_id]
+        #     if val >= back_edge:
+        #         del dag.neighbors[to_id][from_id]
+        #         dag.neighbors[from_id][to_id] += val - back_edge
+        #     else:
+        #         dag.neighbors[to_id][from_id] -= val
+        # else:
+        dag.neighbors[from_id][to_id] += val
 
 
 def calculate_optimal_solution(instance: Instance):
@@ -138,7 +146,7 @@ def calculate_optimal_solution(instance: Instance):
 
         """ Output solution """
         # print("..Construct Solution")
-        solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(int)))
+        solution = DAG(dag.num_nodes, defaultdict(lambda: defaultdict(float)))
         opt_cong = m.ObjVal
         for v in m.getVars():
             if v.VarName != "cong":
@@ -147,7 +155,9 @@ def calculate_optimal_solution(instance: Instance):
 
         m.dispose()
 
-        return Solution(solution, opt_cong)
+        sol_with_cycles = Solution(solution, opt_cong)
+
+        return remove_cycles(sol_with_cycles)
 
     except gp.GurobiError as e:
         print('Error code ' + str(e.message) + ': ' + str(e))
