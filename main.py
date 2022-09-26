@@ -11,7 +11,7 @@ from conjectures import check_all_conjectures
 def verify_instance(inst: Instance, index: int, show_results=False):
     logger = get_logger()
     sol_time, opt_solution = time_execution(calculate_optimal_solution, inst)
-    logger.info(f"Calculated optimal solution{f'   ({sol_time:0.2f}s)' if sol_time > 1 else ''}")
+    logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
 
     if opt_solution is None:
         logger.info("-> Infeasible Model!")
@@ -21,7 +21,7 @@ def verify_instance(inst: Instance, index: int, show_results=False):
         show_graph(inst, f"graph_{index}", opt_solution.dag)
 
     ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst.sources)
-    logger.info(f"Calculated ECMP solution{f'   ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+    logger.info(f"Calculated {len(ecmp_solutions)} ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
     return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
 
@@ -54,8 +54,8 @@ def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
     print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
 
-def inspect_instance(id):
-    with open(f"graph/graph{id}.pickle", "rb") as f:
+def inspect_instance(inst_id):
+    with open(f"graph/errors_loads/ex_{inst_id}.pickle", "rb") as f:
         inst = pickle.load(f)
 
         solution = calculate_optimal_solution(inst)
@@ -79,6 +79,26 @@ def inspect_instance(id):
         compare_node_loads(ecmp_sol.loads, optimal_loads, inst.sources)
 
 
+def inspect(inst_id):
+    with open(f"graph/errors_loads/ex_{inst_id}.pickle", "rb") as f:
+        inst = pickle.load(f)
+        opt_sol = calculate_optimal_solution(inst)
+        ecmp_sols = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst.sources)
+
+        trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target)
+
+        s = [
+            (sum([len(sol.dag.neighbors[i]) for i in range(ecmp_sols[0].dag.num_nodes)]), index)
+            for index, sol in enumerate(ecmp_sols)
+        ]
+        smallest_dag = ecmp_sols[min(s)[1]]
+
+        show_graph(trimmed_inst, "_OPT", opt_sol.dag)
+        show_graph(trimmed_inst, "_TRIMMED", smallest_dag.dag)
+
+        check_all_conjectures(opt_sol, ecmp_sols, inst, 90000 + inst_id)
+
+
 def run_multiprocessing(num_processes, num_iterations):
     procs = []
     for i in range(min(num_processes, 8)):
@@ -90,12 +110,12 @@ def run_multiprocessing(num_processes, num_iterations):
         proc.join()
 
 
-MAX_NUM_NODES = 10
+MAX_NUM_NODES = 8
 
 
 if __name__ == '__main__':
-    # inspect_instance(332)
+    inspect(16)
     # test_suite(50)
-    run_multiprocessing(4, 200)
+    # run_multiprocessing(8, 200)
 
 
