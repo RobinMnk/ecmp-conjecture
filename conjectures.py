@@ -5,6 +5,8 @@ import os
 
 
 class Conjecture:
+    VERBOSE = True
+
     def __init__(self, name, verification_function, failure_message):
         self.name = name
         self.verification_function = verification_function
@@ -14,7 +16,8 @@ class Conjecture:
         success = self.verification_function(opt_solution, ecmp_solutions, inst)
         if not success:
             # FAIL
-            self.print_failure(opt_solution, ecmp_solutions, inst, index)
+            if Conjecture.VERBOSE:
+                self.print_failure(opt_solution, ecmp_solutions, inst, index)
             return False
 
         return True

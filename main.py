@@ -4,8 +4,26 @@ from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution
-from ecmp import get_optimal_ECMP_sub_DAG, get_ALL_optimal_ECMP_sub_DAGs
+from ecmp import get_optimal_ECMP_sub_DAG, get_ALL_optimal_ECMP_sub_DAGs, check_conjectures_for_every_sub_DAG
 from conjectures import check_all_conjectures
+
+
+def check_on_optimal_only(opt_solution: Solution, inst: Instance, index: int):
+    logger = get_logger()
+    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst.sources)
+    logger.info(f"Calculated {len(ecmp_solutions)} ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+    return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
+
+
+def check_simultaneous(opt_solution: Solution, inst: Instance, index: int):
+    logger = get_logger()
+    ecmp_time, success = time_execution(check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
+    logger.info(f"Calculated ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+
+    if not success:
+        show_graph(inst, "_FAILURE", opt_solution.dag)
+
+    return success
 
 
 def verify_instance(inst: Instance, index: int, show_results=False):
@@ -20,10 +38,7 @@ def verify_instance(inst: Instance, index: int, show_results=False):
     if show_results:
         show_graph(inst, f"graph_{index}", opt_solution.dag)
 
-    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst.sources)
-    logger.info(f"Calculated {len(ecmp_solutions)} ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
-
-    return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
+    return check_simultaneous(opt_solution, inst, index)
 
 
 def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
@@ -110,12 +125,12 @@ def run_multiprocessing(num_processes, num_iterations):
         proc.join()
 
 
-MAX_NUM_NODES = 8
+MAX_NUM_NODES = 10
 
 
 if __name__ == '__main__':
-    inspect(16)
+    # inspect(16)
     # test_suite(50)
-    # run_multiprocessing(8, 200)
+    run_multiprocessing(8, 1000)
 
 
