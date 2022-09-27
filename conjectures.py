@@ -39,9 +39,9 @@ class Conjecture:
 
 MAIN_CONJECTURE = Conjecture(
     "congestion",
-    lambda opt_sol, ecmp_sols, inst: ecmp_sols[0].congestion < 2 * opt_sol.opt_congestion,
-    lambda opt_sol, ecmp_sols, inst:
-    f"Optimal Congestion: {opt_sol.opt_congestion}\nECMP Congestion: {ecmp_sols.congestion}\n"
+    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion < 2 * opt_sol.opt_congestion,
+    lambda opt_sol, ecmp_sols, _:
+        f"Optimal Congestion: {opt_sol.opt_congestion}\nECMP Congestion: {ecmp_sols.congestion}\n"
 )
 
 
@@ -78,7 +78,7 @@ LOADS_CONJECTURE = Conjecture(
 )
 
 
-def check_same_edges(opt_solution: Solution, ecmp_sols: list[ECMP_Sol], instance: Instance):
+def check_same_edges(_, ecmp_sols: list[ECMP_Sol], __):
     num_edges = sum([len(ecmp_sols[0].dag.neighbors[i]) for i in range(ecmp_sols[0].dag.num_nodes)])
     return all([
         sum([

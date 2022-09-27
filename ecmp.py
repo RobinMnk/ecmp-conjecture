@@ -3,7 +3,7 @@ import itertools
 import more_itertools
 import copy
 
-from conjectures import check_all_conjectures, Conjecture
+from conjectures import check_all_conjectures, Conjecture, MAIN_CONJECTURE, LOADS_CONJECTURE
 from model import *
 
 
@@ -92,3 +92,18 @@ def check_conjectures_for_every_sub_DAG(opt_solution: Solution, inst: Instance, 
             solution = result
     Conjecture.VERBOSE = verbose
     return solution
+
+
+def check_sequentially_for_every_sub_DAG(opt_solution: Solution, inst: Instance, index: int) -> bool:
+    verbose = Conjecture.VERBOSE
+    Conjecture.VERBOSE = False
+    success = True
+    for sub_dag in iterate_sub_DAG(opt_solution.dag):
+        result = get_ecmp_DAG(sub_dag, inst.sources)
+        if LOADS_CONJECTURE.check(opt_solution, [result], inst, index) and \
+                not MAIN_CONJECTURE.check(opt_solution, [result], inst, index):
+            success = False
+            break
+
+    Conjecture.VERBOSE = verbose
+    return success
