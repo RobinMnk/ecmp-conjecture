@@ -39,9 +39,9 @@ class Conjecture:
 
 MAIN_CONJECTURE = Conjecture(
     "congestion",
-    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion < 2 * opt_sol.opt_congestion,
+    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion <= 2 * opt_sol.opt_congestion,
     lambda opt_sol, ecmp_sols, _:
-        f"Optimal Congestion: {opt_sol.opt_congestion}\nECMP Congestion: {ecmp_sols.congestion}\n"
+    f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\n"
 )
 
 
@@ -99,8 +99,27 @@ SAME_NUMBER_OF_EDGES_CONJECTURE = Conjecture(
 # !!!!!!!!!! PROVED WRONG !!!!!!!!!!
 
 
+EDGE_LOAD_CONJECTURE = Conjecture(
+    "edge_loads",
+    lambda opt_sol, ecmp_sols, _: any(
+        all(get_edge_loads(ecmp.dag)[edge] < 2 * get_edge_loads(opt_sol.dag)[edge] for edge in
+            get_edge_loads(ecmp.dag).keys()) for ecmp in
+        ecmp_sols
+    ),
+    lambda opt_sol, ecmp_sols, inst: f"Graph has {inst.dag.num_nodes} nodes.\n"
+                                     f"opt. edge loads: {get_edge_loads(opt_sol.dag)}\n" +
+                                     "\n".join(
+                                         f"ecmp edge loads: {get_edge_loads(ecmp.dag)}"
+                                         for ecmp in ecmp_sols
+                                         if not all(
+                                             get_edge_loads(ecmp.dag)[edge] < 2 * get_edge_loads(opt_sol.dag)[edge] for
+                                             edge in get_edge_loads(ecmp.dag).keys())
+                                     )
+
+)
+
 ALL_CONJECTURES = [
-    MAIN_CONJECTURE, LOADS_CONJECTURE
+    MAIN_CONJECTURE
 ]
 
 

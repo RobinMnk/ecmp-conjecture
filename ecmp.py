@@ -1,4 +1,5 @@
 import itertools
+from typing import NewType
 
 import more_itertools
 import copy
@@ -49,8 +50,38 @@ def _get_removable_edges(dag: DAG):
     return edges
 
 
-def iterate_sub_DAG(dag: DAG):
-    edges = _get_removable_edges(dag)
+def _get_single_forwarding_removable_edges(dag: DAG):
+    edges = list()
+    for node in range(dag.num_nodes):
+        if len(dag.neighbors[node]) > 1:
+            row = list()
+            lst = [(node, nb) for nb in dag.neighbors[node]]
+            for entry in lst:
+                row.append([x for x in lst if x != entry])
+            edges.append(row)
+    return edges
+
+
+def iterate_sub_DAG(dag: DAG, mode="ecmp"):
+    """
+        Parameters:
+                dag (DAG): The DAG to iterate
+                mode ("ecmp" | "single_forwarding"): the type of returned sub-DAG
+
+        Returns:
+                Generator to iterate all sub DAGs based on mode
+    """
+    if mode == "ecmp":
+        edges = _get_removable_edges(dag)
+    elif mode == "single_forwarding":
+        edges = _get_single_forwarding_removable_edges(dag)
+    else:
+        print("iterate_sub_DAG got unexpected 'mode' parameter.\nExpected 'ecmp' or 'single_forwarding'")
+        return None
+
+    if not edges:
+        yield dag
+        return None
 
     for pos in itertools.product(*edges):
         cp = copy.deepcopy(dag)
@@ -107,3 +138,16 @@ def check_sequentially_for_every_sub_DAG(opt_solution: Solution, inst: Instance,
 
     Conjecture.VERBOSE = verbose
     return success
+
+
+def get_ALL_optimal_single_forwarding_DAGs(dag: DAG, sources: list[int]) -> list[ECMP_Sol]:
+    all_best = []
+    best_congestion = dag.num_nodes
+    for sub_dag in iterate_sub_DAG(dag, mode="single_forwarding"):
+        result = get_ecmp_DAG(sub_dag, sources)
+        if result.congestion < best_congestion:
+            all_best = [result]
+            best_congestion = result.congestion
+        if result.congestion == best_congestion:
+            all_best.append(result)
+    return all_best

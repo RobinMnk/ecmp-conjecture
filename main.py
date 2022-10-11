@@ -5,24 +5,30 @@ from multiprocessing import Process
 from model import *
 from optimal_solver import calculate_optimal_solution
 from ecmp import get_optimal_ECMP_sub_DAG, get_ALL_optimal_ECMP_sub_DAGs, check_conjectures_for_every_sub_DAG, \
-    check_sequentially_for_every_sub_DAG
+    check_sequentially_for_every_sub_DAG, get_ALL_optimal_single_forwarding_DAGs
 from conjectures import check_all_conjectures
 
 
 def check_on_optimal_only(opt_solution: Solution, inst: Instance, index: int):
     logger = get_logger()
-    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst.sources)
-    logger.info(f"Calculated {len(ecmp_solutions)} ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_single_forwarding_DAGs, opt_solution.dag, inst.sources)
+    if not ecmp_solutions:
+        show_graph(inst, "_NO_SINGLE", opt_solution.dag)
+        save_instance("examples", inst, 0)
+        exit(0)
+    logger.info(f"Verified conjectures on optimal sub-DAGs only\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
     return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
 
 
-def check_simultaneous(opt_solution: Solution, inst: Instance, index: int):
+def check_on_all_sub_DAGs(opt_solution: Solution, inst: Instance, index: int):
     logger = get_logger()
     ecmp_time, solution = time_execution(check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
-    logger.info(f"Calculated ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+    logger.info(f"Verified all conjectures across all sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
     if solution is None:
+        save_instance("examples", inst, index)
         show_graph(inst, "_FAILURE", opt_solution.dag)
+        print("FAIL")
 
     return solution is not None
 
@@ -33,6 +39,7 @@ def check_loads_first(opt_solution: Solution, inst: Instance, index: int):
     logger.info(f"Calculated ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
     if solution is None:
+        save_instance("examples", inst, index)
         show_graph(inst, "_FAILURE", opt_solution.dag)
 
     return solution is not None
@@ -50,7 +57,7 @@ def verify_instance(inst: Instance, index: int, show_results=False):
     if show_results:
         show_graph(inst, f"graph_{index}", opt_solution.dag)
 
-    return check_loads_first(opt_solution, inst, index)
+    return verification_function(opt_solution, inst, index)
 
 
 def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
@@ -106,24 +113,32 @@ def inspect_instance(inst_id):
         compare_node_loads(ecmp_sol.loads, optimal_loads, inst.sources)
 
 
-def inspect(inst_id):
-    with open(f"graph/errors_loads/ex_{inst_id}.pickle", "rb") as f:
+def inspect(inst_id: int, folder: str):
+    with open(f"graph/{folder}/ex_{inst_id}.pickle", "rb") as f:
         inst = pickle.load(f)
         opt_sol = calculate_optimal_solution(inst)
-        ecmp_sols = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst.sources)
+        # ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst.sources)
+        ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_single_forwarding_DAGs(opt_sol.dag, inst.sources)
 
         trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target)
 
-        s = [
-            (sum([len(sol.dag.neighbors[i]) for i in range(ecmp_sols[0].dag.num_nodes)]), index)
-            for index, sol in enumerate(ecmp_sols)
-        ]
-        smallest_dag = ecmp_sols[min(s)[1]]
+        # s = [
+        #     (sum([len(sol.dag.neighbors[i]) for i in range(ecmp_sols[0].dag.num_nodes)]), index)
+        #     for index, sol in enumerate(ecmp_sols)
+        # ]
+        # smallest_dag = ecmp_sols[min(s)[1]]
 
         show_graph(trimmed_inst, "_OPT", opt_sol.dag)
-        show_graph(trimmed_inst, "_TRIMMED", smallest_dag.dag)
+        show_graph(trimmed_inst, "_TRIMMED", ecmp_sols[0].dag)
 
-        check_all_conjectures(opt_sol, ecmp_sols, inst, 90000 + inst_id)
+        # verification_function(opt_sol, inst, 90000 + inst_id)
+
+        # check_all_conjectures(opt_sol, ecmp_sols, inst, 90000 + inst_id)
+
+        # print(all([
+        #     all([a == b for (a, b) in zip(sol.loads, get_node_loads(sol.dag, inst.sources))])
+        #     for sol in ecmp_sols
+        # ]))
 
 
 def run_multiprocessing(num_processes, num_iterations):
@@ -137,12 +152,12 @@ def run_multiprocessing(num_processes, num_iterations):
         proc.join()
 
 
-MAX_NUM_NODES = 10
+""" Setup """
+MAX_NUM_NODES = 6
+verification_function = check_on_optimal_only
 
 
 if __name__ == '__main__':
-    # inspect(16)
+    # inspect(0, "examples")
     # test_suite(50)
-    run_multiprocessing(8, 500)
-
-
+    run_multiprocessing(8, 1000)
