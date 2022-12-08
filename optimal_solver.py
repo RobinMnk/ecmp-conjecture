@@ -105,6 +105,7 @@ def calculate_optimal_solution(instance: Instance):
     dag: DAG = instance.dag
     sources = instance.sources
     target = instance.target
+    demands = instance.demands
 
     try:
         # print("..Setup Model")
@@ -130,8 +131,8 @@ def calculate_optimal_solution(instance: Instance):
         m.setObjective(cong, GRB.MINIMIZE)
 
         """ Add constraints """
-        for s in sources:
-            m.addConstr(sum(path_vars[s]) >= 1, name=f"source:{s}")
+        for i, s in enumerate(sources):
+            m.addConstr(sum(path_vars[s]) >= demands[i], name=f"source:{s}")
 
         m.update()  # necessary to ensure we can access the variables by name below!
         for k, v in edge_dict.items():

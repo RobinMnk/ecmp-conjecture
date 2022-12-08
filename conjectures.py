@@ -39,14 +39,14 @@ class Conjecture:
 
 MAIN_CONJECTURE = Conjecture(
     "congestion",
-    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion <= 2 * opt_sol.opt_congestion,
+    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion < 2 * opt_sol.opt_congestion,
     lambda opt_sol, ecmp_sols, _:
     f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\n"
 )
 
 
 def check_loads(opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], instance: Instance):
-    optimal_loads = get_node_loads(opt_solution.dag, instance.sources)
+    optimal_loads = get_node_loads(opt_solution.dag, instance)
     return any([
         compare_node_loads(ecmp_sol.loads, optimal_loads, instance.sources) is None
         for ecmp_sol in ecmp_solutions
@@ -54,11 +54,11 @@ def check_loads(opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], instance
 
 
 def loads_failed(opt_solution: Solution, ecmp_solutions: [ECMP_Sol], instance: Instance):
-    optimal_loads = get_node_loads(opt_solution.dag, instance.sources)
+    optimal_loads = get_node_loads(opt_solution.dag, instance)
 
     output = ""
     for i, ecmp_sol in enumerate(ecmp_solutions):
-        trimmed_inst = Instance(opt_solution.dag, instance.sources, instance.target)
+        trimmed_inst = Instance(opt_solution.dag, instance.sources, instance.target, instance.demands)
         show_graph(trimmed_inst, f"_THIS_{i}", ecmp_sol.dag)
         failed_node = compare_node_loads(ecmp_sol.loads, optimal_loads, instance.sources)
         output += f"Error in sub-DAG with index {i}:\n" \
@@ -102,7 +102,7 @@ SAME_NUMBER_OF_EDGES_CONJECTURE = Conjecture(
 EDGE_LOAD_CONJECTURE = Conjecture(
     "edge_loads",
     lambda opt_sol, ecmp_sols, _: any(
-        all(get_edge_loads(ecmp.dag)[edge] < 2 * get_edge_loads(opt_sol.dag)[edge] for edge in
+        all(get_edge_loads(ecmp.dag)[edge] <= 2 * get_edge_loads(opt_sol.dag)[edge] for edge in
             get_edge_loads(ecmp.dag).keys()) for ecmp in
         ecmp_sols
     ),
@@ -119,7 +119,7 @@ EDGE_LOAD_CONJECTURE = Conjecture(
 )
 
 ALL_CONJECTURES = [
-    MAIN_CONJECTURE
+    MAIN_CONJECTURE, EDGE_LOAD_CONJECTURE
 ]
 
 
