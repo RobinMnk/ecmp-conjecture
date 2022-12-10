@@ -14,6 +14,19 @@ The framework offers many great features for analyzing routing problems empirica
     All output is logged and files for further inspection are generated.
 - Support for multiprocessing on multiple threads
 
+Running a fully multi-threaded test is done in just four simple lines of code!
+
+```python
+ig = InstanceGenerator(max_nodes=12, arbitrary_demands=True)
+ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
+ConjectureManager.register(MAIN_CONJECTURE,
+                           LOADS_CONJECTURE,
+                           LOADS_CONJECTURE.implies(MAIN_CONJECTURE),
+                           MAIN_CONJECTURE.implies(LOADS_CONJECTURE)
+                          )
+run_multiprocessing_suite(ig, 8, 10000)
+```
+
 ## The Framework
 
 The framework tests conjectures by generating a random routing instance and checking whether the assumption holds up. In our simulations, no counterexample for our main conjecture has been found.
@@ -41,15 +54,5 @@ to denote the new assumption that the loads conjecture implies the main conjectu
 
 Running a test is done in just four simple lines of code!
 
-```python
 
-    ig = InstanceGenerator(max_node=12, arbitrary_demands=True)
-    ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
-    ConjectureManager.register(MAIN_CONJECTURE,
-                               LOADS_CONJECTURE,
-                               LOADS_CONJECTURE.implies(MAIN_CONJECTURE),
-                               MAIN_CONJECTURE.implies(LOADS_CONJECTURE)
-                              )
-    run_single_test_suite(ig, 2000)
-```
 
