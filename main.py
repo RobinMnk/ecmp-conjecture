@@ -42,11 +42,17 @@ class ConjectureManager:
     conjectures_to_check = []
     checking_type = CHECK_ON_OPTIMAL_SUB_DAGS_ONLY
     forwarding_type = ECMP_FORWARDING
+    exit_on_counterexample = True
 
     @classmethod
-    def setup(cls, checking_type=CHECK_ON_OPTIMAL_SUB_DAGS_ONLY, forwarding_type=ECMP_FORWARDING):
+    def setup(cls,
+              checking_type=CHECK_ON_OPTIMAL_SUB_DAGS_ONLY,
+              forwarding_type=ECMP_FORWARDING,
+              exit_on_counterexample=True
+              ):
         cls.checking_type = checking_type
         cls.forwarding_type = forwarding_type
+        cls.exit_on_counterexample = exit_on_counterexample
 
     @classmethod
     def register(cls, *conj):
@@ -75,26 +81,37 @@ class ConjectureManager:
     def _check_on_optimal_only(cls, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst)
+        logger.info(f"Calculated optimal ECMP sub-DAGs in\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+
         if not ecmp_solutions:
-            show_graph(inst, "_NO_SINGLE", opt_solution.dag)
-            save_instance("examples", inst, 0)
-            print("ERROR - exiting")
-            exit(0)
-        logger.info(f"Verified conjectures on optimal sub-DAGs only\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
-        return cls._check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
+            show_graph(inst, f"ex_{index}", opt_solution.dag)
+            save_instance("failures", inst, index)
+            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+                         f"Check the failures/ex_{index} files. Exiting.")
+            exit(1)
+
+        verification_time, solution = time_execution(
+            cls._check_all_conjectures, opt_solution, ecmp_solutions, inst, index
+        )
+
+        if solution:
+            logger.info(f"Verified all conjectures for optimal ECMP DAGs"
+                        f"\t{f'  ({verification_time:0.2f}s)' if verification_time > 1 else ''}")
+            return True
+
+        return False
 
     @classmethod
     def _check_on_all_sub_DAGs(cls, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, solution = time_execution(cls._check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
-        logger.info(f"Verified all conjectures across all sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
-        if solution is None:
-            save_instance("examples", inst, index)
-            show_graph(inst, "_FAILURE", opt_solution.dag)
-            print(f"FAIL: gr{index}")
+        if solution is not None:
+            logger.info(f"Verified all conjectures across all sub-DAGs"
+                        f"\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+            return True
 
-        return solution is not None
+        return False
 
     @classmethod
     def verify_instance(cls, inst: Instance, index: int, show_results=False):
@@ -103,7 +120,7 @@ class ConjectureManager:
         logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
 
         if opt_solution is None:
-            logger.info("-> Infeasible Model!")
+            logger.info("-> Infeasible Instance!")
             return True
 
         if show_results:
@@ -123,15 +140,13 @@ def run_single_test_suite(generator: InstanceGenerator, num_iterations=100, show
 
     for i in range(num_iterations):
         logger.info("-" * 72)
-        logger.info(f"Begin Iteration {i+1}:")
+        logger.info(f"Begin Iteration {i + 1}:")
         inst = next(generator)
-        opt = calculate_optimal_solution(inst)
-        if opt is None:
-            continue
         success = ConjectureManager.verify_instance(inst, i, show_results=show_results)
         if not success:
-            logger.error("")
-            print(f"!!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
+            logger.error("=" * 50)
+            logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
+            logger.error("=" * 50)
             exit(0)
 
     logger.info("")
@@ -212,6 +227,6 @@ if __name__ == '__main__':
     ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS)
     ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE))
 
-    # inspect(5655, "examples")
+    # inspect(8, "failures")
     run_single_test_suite(ig, 200)
     # run_multiprocessing_suite(ig, 8, 10000)

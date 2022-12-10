@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import os
 import pickle
 import sys
 import time
@@ -144,5 +145,6 @@ def time_execution(function, *parameters):
 
 
 def save_instance(path: str, inst: Instance, index: int):
+    os.makedirs(f"graph/{path}", exist_ok=True)
     with open(f"graph/{path}/ex_{index}.pickle", "wb") as f:
         pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
