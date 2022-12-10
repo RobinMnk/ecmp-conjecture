@@ -11,19 +11,19 @@ The framework offers many great features for analyzing routing problems empirica
 - A visual output by converting each instance and solution to the DOT-graph format
 - Three solvers: An optimal solver, an equal-splitting and an integral-flow solver, each running in exponential time
 - A framework for adding/customizing conjectures that can be checked either for every sub-DAG of the optimal flow or just for those where equal-splitting was optimal.
-    All output is logged and files for further inspection are generated.
+- Complete logging of all processes
 - Support for multiprocessing on multiple threads
 
-Running a fully multi-threaded test is done in just four simple lines of code!
+#### Running a fully multi-threaded test is done in just four simple lines of code!
 
 ```python
-ig = InstanceGenerator(max_nodes=12, arbitrary_demands=True)
 ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
 ConjectureManager.register(MAIN_CONJECTURE,
                            LOADS_CONJECTURE,
                            LOADS_CONJECTURE.implies(MAIN_CONJECTURE),
                            MAIN_CONJECTURE.implies(LOADS_CONJECTURE)
                           )
+ig = InstanceGenerator(max_nodes=12, arbitrary_demands=True)
 run_multiprocessing_suite(ig, 8, 10000)
 ```
 
@@ -52,7 +52,7 @@ to denote the new assumption that the loads conjecture implies the main conjectu
 
 ## Usage
 
-Running a test is done in just four simple lines of code!
+In the Instance Generator
 
 
 

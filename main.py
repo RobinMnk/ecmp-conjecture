@@ -188,11 +188,10 @@ def inspect_instance(inst_id: int, folder: str):
 
 
 if __name__ == '__main__':
-    ig = InstanceGenerator(12, True)
-
     ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
     ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE), MAIN_CONJECTURE.implies(LOADS_CONJECTURE))
 
+    ig = InstanceGenerator(12, True)
     # inspect_instance(1, "examples")
     # run_single_test_suite(ig, 2000)
     run_multiprocessing_suite(ig, 8, 10000)
