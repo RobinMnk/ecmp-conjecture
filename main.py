@@ -2,8 +2,7 @@ from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution
-from ecmp import get_ALL_optimal_ECMP_sub_DAGs, get_ALL_optimal_single_forwarding_DAGs, get_optimal_ECMP_sub_DAG, \
-    iterate_sub_DAG, get_ecmp_DAG
+from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG
 from conjectures import MAIN_CONJECTURE, LOADS_CONJECTURE, Conjecture
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
@@ -191,9 +190,9 @@ def inspect_instance(inst_id: int, folder: str):
 if __name__ == '__main__':
     ig = InstanceGenerator(12, True)
 
-    ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS)
-    ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE))
+    ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
+    ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE), MAIN_CONJECTURE.implies(LOADS_CONJECTURE))
 
     # inspect_instance(1, "examples")
-    run_single_test_suite(ig, 2000)
-    # run_multiprocessing_suite(ig, 8, 10000)
+    # run_single_test_suite(ig, 2000)
+    run_multiprocessing_suite(ig, 8, 10000)
