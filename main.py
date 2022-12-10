@@ -4,92 +4,120 @@ from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution
-from ecmp import get_ALL_optimal_ECMP_sub_DAGs, check_conjectures_for_every_sub_DAG, \
-    check_sequentially_for_every_sub_DAG, get_ALL_optimal_single_forwarding_DAGs, get_optimal_ECMP_sub_DAG
-from conjectures import check_all_conjectures
+from ecmp import get_ALL_optimal_ECMP_sub_DAGs, get_ALL_optimal_single_forwarding_DAGs, get_optimal_ECMP_sub_DAG, \
+    iterate_sub_DAG, get_ecmp_DAG
+from conjectures import MAIN_CONJECTURE, LOADS_CONJECTURE, Conjecture
+
+CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
+CHECK_ON_ALL_SUB_DAGS = 1
 
 
-def check_on_optimal_only(opt_solution: Solution, inst: Instance, index: int):
-    logger = get_logger()
-    ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst)
-    if not ecmp_solutions:
-        show_graph(inst, "_NO_SINGLE", opt_solution.dag)
-        save_instance("examples", inst, 0)
-        print("ERROR - exiting")
-        exit(0)
-    logger.info(f"Verified conjectures on optimal sub-DAGs only\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
-    return check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
+class ConjectureManager:
+    def __init__(self, verification_type=CHECK_ON_OPTIMAL_SUB_DAGS_ONLY):
+        self.conjectures_to_check = []
+        if verification_type == CHECK_ON_ALL_SUB_DAGS:
+            self.__verification_function = self.__check_on_all_sub_DAGs
+        elif verification_type == CHECK_ON_OPTIMAL_SUB_DAGS_ONLY:
+            self.__verification_function = self.__check_on_optimal_only
+        else:
+            raise RuntimeError("Invalid value for verification_type.")
 
+    def register(self, conj):
+        self.conjectures_to_check.append(conj)
 
-def check_on_all_sub_DAGs(opt_solution: Solution, inst: Instance, index: int):
-    logger = get_logger()
-    ecmp_time, solution = time_execution(check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
-    logger.info(f"Verified all conjectures across all sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+    def __check_all_conjectures(self, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance, index: int):
+        return all(
+            conj.check(opt_solution, ecmp_solutions, inst, index)
+            for conj in self.conjectures_to_check
+        )
 
-    if solution is None:
-        save_instance("examples", inst, index)
-        show_graph(inst, "_FAILURE", opt_solution.dag)
-        print("FAIL: gr{index}")
+    def __check_conjectures_for_every_sub_DAG(self, opt_solution: Solution, inst: Instance, index: int) -> ECMP_Sol:
+        solution = None
+        verbose = Conjecture.VERBOSE
+        Conjecture.VERBOSE = False
+        for sub_dag in iterate_sub_DAG(opt_solution.dag):
+            result = get_ecmp_DAG(sub_dag, inst)
+            if self.__check_all_conjectures(opt_solution, [result], inst, index):
+                solution = result
+        Conjecture.VERBOSE = verbose
+        return solution
 
-    return solution is not None
-
-
-def check_loads_first(opt_solution: Solution, inst: Instance, index: int):
-    logger = get_logger()
-    ecmp_time, solution = time_execution(check_sequentially_for_every_sub_DAG, opt_solution, inst, index)
-    logger.info(f"Calculated ECMP solutions\t{f'({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
-
-    if solution is None:
-        save_instance("examples", inst, index)
-        show_graph(inst, "_FAILURE", opt_solution.dag)
-
-    return solution is not None
-
-
-def verify_instance(inst: Instance, index: int, show_results=False):
-    logger = get_logger()
-    sol_time, opt_solution = time_execution(calculate_optimal_solution, inst)
-    logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
-
-    if opt_solution is None:
-        logger.info("-> Infeasible Model!")
-        return True
-
-    if show_results:
-        show_graph(inst, f"graph_{index}", opt_solution.dag)
-
-    return verification_function(opt_solution, inst, index)
-
-
-def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
-    setup_logger(log_to_stdout)
-    logger = get_logger()
-
-    random_bytes = os.urandom(8)
-    seed = int.from_bytes(random_bytes, byteorder="big")
-    random.seed(seed)
-
-    for i in range(num_tests):
-        size = random.randint(4, MAX_NUM_NODES)
-        prob = random.random() * 0.7 + 0.1
-        logger.info("-" * 72)
-        logger.info(f"Iteration {i+1}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
-        inst = build_random_DAG(size, prob, arbitrary_demands)
-        opt = calculate_optimal_solution(inst)
-        if opt is None: continue
-        success = verify_instance(inst, i, show_results=show_results)
-        if not success:
-            logger.error("")
-            print(f"!!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
+    def __check_on_optimal_only(self, opt_solution: Solution, inst: Instance, index: int):
+        logger = get_logger()
+        ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst)
+        if not ecmp_solutions:
+            show_graph(inst, "_NO_SINGLE", opt_solution.dag)
+            save_instance("examples", inst, 0)
+            print("ERROR - exiting")
             exit(0)
+        logger.info(f"Verified conjectures on optimal sub-DAGs only\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+        return self.__check_all_conjectures(opt_solution, ecmp_solutions, inst, index)
 
-    logger.info("")
-    logger.info("=" * 40)
-    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
-    logger.info("=" * 40)
+    def __check_on_all_sub_DAGs(self, opt_solution: Solution, inst: Instance, index: int):
+        logger = get_logger()
+        ecmp_time, solution = time_execution(self.__check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
+        logger.info(f"Verified all conjectures across all sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
-    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
+        if solution is None:
+            save_instance("examples", inst, index)
+            show_graph(inst, "_FAILURE", opt_solution.dag)
+            print("FAIL: gr{index}")
 
+        return solution is not None
+
+    def __verify_instance(self, inst: Instance, index: int, show_results=False):
+        logger = get_logger()
+        sol_time, opt_solution = time_execution(calculate_optimal_solution, inst)
+        logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
+
+        if opt_solution is None:
+            logger.info("-> Infeasible Model!")
+            return True
+
+        if show_results:
+            show_graph(inst, f"graph_{index}", opt_solution.dag)
+
+        return self.__verification_function(opt_solution, inst, index)
+
+    def test_suite(self, num_tests=100, show_results=False, log_to_stdout=True):
+        setup_logger(log_to_stdout)
+        logger = get_logger()
+
+        random_bytes = os.urandom(8)
+        seed = int.from_bytes(random_bytes, byteorder="big")
+        random.seed(seed)
+
+        for i in range(num_tests):
+            size = random.randint(4, MAX_NUM_NODES)
+            prob = random.random() * 0.7 + 0.1
+            logger.info("-" * 72)
+            logger.info(f"Iteration {i+1}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
+            inst = build_random_DAG(size, prob, arbitrary_demands)
+            opt = calculate_optimal_solution(inst)
+            if opt is None:
+                continue
+            success = self.__verify_instance(inst, i, show_results=show_results)
+            if not success:
+                logger.error("")
+                print(f"!!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
+                exit(0)
+
+        logger.info("")
+        logger.info("=" * 40)
+        logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
+        logger.info("=" * 40)
+
+        print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
+
+    def run_multiprocessing(self, num_processes, num_iterations):
+        procs = []
+        for i in range(min(num_processes, 8)):
+            proc = Process(target=self.test_suite, args=(num_iterations, False, False))
+            procs.append(proc)
+            proc.start()
+
+        for proc in procs:
+            proc.join()
 
 def inspect_instance(inst_id):
     with open(f"graph/errors_loads/ex_{inst_id}.pickle", "rb") as f:
@@ -134,7 +162,7 @@ def inspect(inst_id: int, folder: str):
         show_graph(trimmed_inst, "_OPT", opt_sol.dag)
         show_graph(trimmed_inst, "_TRIMMED", ecmp_sols[0].dag)
 
-        print(verification_function(opt_sol, inst, 90000 + inst_id))
+        # print(verification_function(opt_sol, inst, 90000 + inst_id))
 
         # check_all_conjectures(opt_sol, ecmp_sols, inst, 90000 + inst_id)
 
@@ -144,26 +172,21 @@ def inspect(inst_id: int, folder: str):
         # ]))
 
 
-def run_multiprocessing(num_processes, num_iterations):
-    procs = []
-    for i in range(min(num_processes, 8)):
-        proc = Process(target=test_suite, args=(num_iterations, False, False))
-        procs.append(proc)
-        proc.start()
-
-    for proc in procs:
-        proc.join()
-
 
 """ Setup """
 # 1: Adjust ALL_CONJECTURES in conjectures.py
 # 2: Define Parameters
 MAX_NUM_NODES = 12                                      # values at most 14 recommended
-verification_function = check_on_all_sub_DAGs           # set to either check_on_optimal_only or check_on_all_sub_DAGs
+# verification_function = check_on_optimal_only           # set to either check_on_optimal_only or check_on_all_sub_DAGs
 arbitrary_demands = True
 
 
 if __name__ == '__main__':
+    cm = ConjectureManager(CHECK_ON_OPTIMAL_SUB_DAGS_ONLY)
+    cm.register(MAIN_CONJECTURE)
+    cm.register(LOADS_CONJECTURE)
+    # cm.register(MAIN_CONJECTURE.implies(LOADS_CONJECTURE))
+
     # inspect(5655, "examples")
-    # test_suite(20)
-    run_multiprocessing(8, 10000)
+    cm.test_suite(200)
+    # run_multiprocessing(8, 10000)

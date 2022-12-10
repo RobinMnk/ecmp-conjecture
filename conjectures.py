@@ -36,10 +36,22 @@ class Conjecture:
         with open(f"graph/errors_{self.name}/ex_{index}_fail.txt", "w") as f:
             f.write(self.failure_message(opt_solution, ecmp_solutions, inst))
 
+    def implies(self, other):
+        return Conjecture(
+            f"{self.name}_implies_{other.name}",
+            lambda opt_sol, ecmp_sols, inst: other.verification_function(opt_sol, ecmp_sols, inst) or (
+                not self.verification_function(opt_sol, ecmp_sols, inst)
+            ),
+            lambda opt_sol, ecmp_sols, inst: f"The implication {self.name} -> {other.name} failed.\n" +
+                                             self.failure_message(opt_sol, ecmp_sols, inst) + "\n" +
+                                             other.failure_message(opt_sol, ecmp_sols, inst)
+        )
+
 
 MAIN_CONJECTURE = Conjecture(
     "congestion",
-    lambda opt_sol, ecmp_sols, _: ecmp_sols[0].congestion < 2 * opt_sol.opt_congestion,
+    lambda opt_sol, ecmp_sols, _: all(
+        ecmp_sols[i].congestion < 2 * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
     lambda opt_sol, ecmp_sols, _:
     f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\n"
 )
@@ -72,7 +84,7 @@ def loads_failed(opt_solution: Solution, ecmp_solutions: [ECMP_Sol], instance: I
 
 
 LOADS_CONJECTURE = Conjecture(
-    "loads",
+    "node_loads",
     check_loads,
     loads_failed
 )
@@ -117,14 +129,3 @@ EDGE_LOAD_CONJECTURE = Conjecture(
                                      )
 
 )
-
-ALL_CONJECTURES = [
-    MAIN_CONJECTURE, LOADS_CONJECTURE
-]
-
-
-def check_all_conjectures(opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance, index: int):
-    return all(
-        conj.check(opt_solution, ecmp_solutions, inst, index)
-        for conj in ALL_CONJECTURES
-    )

@@ -4,7 +4,7 @@ from typing import NewType
 import more_itertools
 import copy
 
-from conjectures import check_all_conjectures, Conjecture, MAIN_CONJECTURE, LOADS_CONJECTURE
+from conjectures import Conjecture, MAIN_CONJECTURE, LOADS_CONJECTURE
 from model import *
 
 
@@ -99,33 +99,6 @@ def get_ALL_optimal_ECMP_sub_DAGs(dag: DAG, inst: Instance) -> list[ECMP_Sol]:
         if result.congestion == best_congestion:
             all_best.append(result)
     return all_best
-
-
-def check_conjectures_for_every_sub_DAG(opt_solution: Solution, inst: Instance, index: int) -> ECMP_Sol:
-    solution = None
-    verbose = Conjecture.VERBOSE
-    Conjecture.VERBOSE = False
-    for sub_dag in iterate_sub_DAG(opt_solution.dag):
-        result = get_ecmp_DAG(sub_dag, inst)
-        if check_all_conjectures(opt_solution, [result], inst, index):
-            solution = result
-    Conjecture.VERBOSE = verbose
-    return solution
-
-
-def check_sequentially_for_every_sub_DAG(opt_solution: Solution, inst: Instance, index: int) -> bool:
-    verbose = Conjecture.VERBOSE
-    Conjecture.VERBOSE = False
-    success = True
-    for sub_dag in iterate_sub_DAG(opt_solution.dag):
-        result = get_ecmp_DAG(sub_dag, inst.sources)
-        if LOADS_CONJECTURE.check(opt_solution, [result], inst, index) and \
-                not MAIN_CONJECTURE.check(opt_solution, [result], inst, index):
-            success = False
-            break
-
-    Conjecture.VERBOSE = verbose
-    return success
 
 
 def get_ALL_optimal_single_forwarding_DAGs(dag: DAG, inst: Instance) -> list[ECMP_Sol]:
