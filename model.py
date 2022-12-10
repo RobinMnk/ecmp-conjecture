@@ -39,7 +39,7 @@ def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
 
     num_sources = random.randint(2, num_nodes - 2)
     sources = random.sample(range(1, num_nodes - 1), num_sources)
-    demands = [random.randint(2, 10) for _ in range(len(sources))] if arbitrary_demands else [1] * len(sources)
+    demands = [random.randint(1, num_nodes) for _ in range(len(sources))] if arbitrary_demands else [1] * len(sources)
     return Instance(DAG(num_nodes, edges), sources, 0, demands)
 
 

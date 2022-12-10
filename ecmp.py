@@ -33,7 +33,7 @@ def _get_removable_edges(dag: DAG):
     for node in range(dag.num_nodes):
         if len(dag.neighbors[node]) > 1:
             pwset = list(more_itertools.powerset((node, nb) for nb in dag.neighbors[node]))
-            pwset.pop()
+            pwset.pop()  # remove empty edgeset
             edges.append(pwset)
     return edges
 

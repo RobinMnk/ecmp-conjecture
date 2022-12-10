@@ -73,11 +73,10 @@ def test_suite(num_tests=100, show_results=False, log_to_stdout=True):
         size = random.randint(4, MAX_NUM_NODES)
         prob = random.random() * 0.7 + 0.1
         logger.info("-" * 72)
-        logger.info(f"Iteration {i}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
+        logger.info(f"Iteration {i+1}: Building Instance on {size} nodes with edge probability {prob:0.3f}")
         inst = build_random_DAG(size, prob, arbitrary_demands)
         opt = calculate_optimal_solution(inst)
         if opt is None: continue
-        show_graph(Instance(opt.dag, inst.sources, inst.target, inst.demands), "_OUTPUT", opt.dag)
         success = verify_instance(inst, i, show_results=show_results)
         if not success:
             logger.error("")
@@ -157,12 +156,14 @@ def run_multiprocessing(num_processes, num_iterations):
 
 
 """ Setup """
-MAX_NUM_NODES = 11
-verification_function = check_on_optimal_only
+# 1: Adjust ALL_CONJECTURES in conjectures.py
+# 2: Define Parameters
+MAX_NUM_NODES = 12                                      # values at most 14 recommended
+verification_function = check_on_all_sub_DAGs           # set to either check_on_optimal_only or check_on_all_sub_DAGs
 arbitrary_demands = True
 
 
 if __name__ == '__main__':
     # inspect(5655, "examples")
-    test_suite(10)
-    # run_multiprocessing(8, 20000)
+    # test_suite(20)
+    run_multiprocessing(8, 10000)
