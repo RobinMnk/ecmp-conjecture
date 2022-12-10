@@ -14,7 +14,7 @@ The framework offers many great features for analyzing routing problems empirica
 - Complete logging of all processes
 - Support for multiprocessing on multiple threads
 
-#### Running a fully multi-threaded test is done in just four simple lines of code!
+### Running a fully multi-threaded test is done in just four simple lines of code!
 
 ```python
 ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
@@ -49,10 +49,6 @@ LOADS_CONJECTURE.implies(MAIN_CONJECTURE)
 ```
 
 to denote the new assumption that the loads conjecture implies the main conjecture. This can be checked in the exact same way.
-
-## Usage
-
-In the Instance Generator
 
 
 
