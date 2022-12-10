@@ -175,7 +175,7 @@ def inspect_instance(inst_id: int, folder: str):
         print(f"Optimal Congestion: {opt_sol.opt_congestion:0.4f}")
         show_graph(inst, "_before", opt_sol.dag)
 
-        trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, [1] * len(inst.sources))
+        trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
         show_graph(trimmed_inst, "_after", opt_sol.dag)
 
         print("Calculating ECMP opt_sol")
@@ -185,15 +185,15 @@ def inspect_instance(inst_id: int, folder: str):
         factor = ecmp_sols[0].congestion / opt_sol.opt_congestion
         print(f"Factor: {factor}")
 
-        show_graph(trimmed_inst, "_with_ecmp", ecmp_sols[0].dag)
+        show_graph(trimmed_inst, "_ecmp", ecmp_sols[0].dag)
 
 
 if __name__ == '__main__':
-    ig = InstanceGenerator(12, True)
+    # ig = InstanceGenerator(12, True)
+    #
+    # ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS)
+    # ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE))
 
-    ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS)
-    ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE))
-
-    # inspect(8, "failures")
+    inspect_instance(1, "examples")
     # run_single_test_suite(ig, 200)
-    run_multiprocessing_suite(ig, 8, 10000)
+    # run_multiprocessing_suite(ig, 8, 10000)

@@ -109,7 +109,7 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
 
 def show_graph(instance: Instance, name: str, solution: DAG = None):
     dot_source = instance_to_dot(instance, solution)
-    s = graphviz.Source(dot_source, filename=f"graph/{name}", format="svg")
+    s = graphviz.Source(dot_source, filename=f"output/{name}", format="svg")
     s.render(engine="circo")
 
 
@@ -146,6 +146,6 @@ def time_execution(function, *parameters):
 
 
 def save_instance(path: str, inst: Instance, index: int):
-    os.makedirs(f"graph/{path}", exist_ok=True)
-    with open(f"graph/{path}/ex_{index}.pickle", "wb") as f:
+    os.makedirs(f"output/{path}", exist_ok=True)
+    with open(f"output/{path}/ex_{index}.pickle", "wb") as f:
         pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
