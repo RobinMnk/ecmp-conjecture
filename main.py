@@ -1,4 +1,3 @@
-import os
 from multiprocessing import Process
 
 from model import *
@@ -81,7 +80,7 @@ class ConjectureManager:
     def _check_on_optimal_only(cls, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst)
-        logger.info(f"Calculated optimal ECMP sub-DAGs in\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+        logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
         if not ecmp_solutions:
             show_graph(inst, f"ex_{index}", opt_solution.dag)
@@ -124,7 +123,7 @@ class ConjectureManager:
             return True
 
         if show_results:
-            show_graph(inst, f"graph_{index}", opt_solution.dag)
+            show_graph(inst, f"output_{index}", opt_solution.dag)
 
         if cls.checking_type == CHECK_ON_OPTIMAL_SUB_DAGS_ONLY:
             return cls._check_on_optimal_only(opt_solution, inst, index)
@@ -168,57 +167,25 @@ def run_multiprocessing_suite(generator: InstanceGenerator, num_processes, num_i
         proc.join()
 
 
-def inspect_instance(inst_id):
-    with open(f"graph/errors_loads/ex_{inst_id}.pickle", "rb") as f:
+def inspect_instance(inst_id: int, folder: str):
+    with open(f"output/{folder}/ex_{inst_id}.pickle", "rb") as f:
         inst = pickle.load(f)
 
-        solution = calculate_optimal_solution(inst)
-        print(f"Optimal Congestion: {solution.opt_congestion:0.4f}")
-        show_graph(inst, "_before", solution.dag)
+        opt_sol = calculate_optimal_solution(inst)
+        print(f"Optimal Congestion: {opt_sol.opt_congestion:0.4f}")
+        show_graph(inst, "_before", opt_sol.dag)
 
-        trimmed_inst = Instance(solution.dag, inst.sources, inst.target, [1] * len(inst.sources))
-        show_graph(trimmed_inst, "_after", solution.dag)
+        trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, [1] * len(inst.sources))
+        show_graph(trimmed_inst, "_after", opt_sol.dag)
 
-        optimal_loads = get_node_loads(solution.dag, inst.sources)
+        print("Calculating ECMP opt_sol")
+        ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst)
+        print(f"ECMP Congestion: {ecmp_sols[0].congestion}")
 
-        print("Calculating ECMP solution")
-        ecmp_sol: ECMP_Sol = get_optimal_ECMP_sub_DAG(solution.dag, inst.sources)
-        print(f"ECMP Congestion: {ecmp_sol.congestion}")
-
-        factor = ecmp_sol.congestion / solution.opt_congestion
+        factor = ecmp_sols[0].congestion / opt_sol.opt_congestion
         print(f"Factor: {factor}")
 
-        show_graph(trimmed_inst, "_with_ecmp", ecmp_sol.dag)
-
-        compare_node_loads(ecmp_sol.loads, optimal_loads, inst.sources)
-
-
-def inspect(inst_id: int, folder: str):
-    with open(f"graph/{folder}/ex_{inst_id}.pickle", "rb") as f:
-        inst: Instance = pickle.load(f)
-        opt_sol = calculate_optimal_solution(inst)
-        ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst)
-        # ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_single_forwarding_DAGs(opt_sol.dag, inst)
-
-        trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
-
-        # s = [
-        #     (sum([len(sol.dag.neighbors[i]) for i in range(ecmp_sols[0].dag.num_nodes)]), index)
-        #     for index, sol in enumerate(ecmp_sols)
-        # ]
-        # smallest_dag = ecmp_sols[min(s)[1]]
-
-        show_graph(trimmed_inst, "_OPT", opt_sol.dag)
-        show_graph(trimmed_inst, "_TRIMMED", ecmp_sols[0].dag)
-
-        # print(verification_function(opt_sol, inst, 90000 + inst_id))
-
-        # check_all_conjectures(opt_sol, ecmp_sols, inst, 90000 + inst_id)
-
-        # print(all([
-        #     all([a == b for (a, b) in zip(sol.loads, get_node_loads(sol.dag, inst.sources))])
-        #     for sol in ecmp_sols
-        # ]))
+        show_graph(trimmed_inst, "_with_ecmp", ecmp_sols[0].dag)
 
 
 if __name__ == '__main__':
@@ -228,5 +195,5 @@ if __name__ == '__main__':
     ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE))
 
     # inspect(8, "failures")
-    run_single_test_suite(ig, 200)
-    # run_multiprocessing_suite(ig, 8, 10000)
+    # run_single_test_suite(ig, 200)
+    run_multiprocessing_suite(ig, 8, 10000)

@@ -75,9 +75,9 @@ def remove_cycles(graph: DAG):
     while check_from_all_nodes():
         count += 1
         if count > 100:
-            with open(f"graph/progr_error/graph.pickle", "wb") as f:
+            with open(f"output/progr_error/graph.pickle", "wb") as f:
                 pickle.dump(graph, f, pickle.HIGHEST_PROTOCOL)
-            with open(f"graph/progr_error/graph.txt", "w") as f:
+            with open(f"output/progr_error/graph.txt", "w") as f:
                 f.write("Could not remove all cycles!")
 
     check_from_all_nodes()

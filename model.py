@@ -126,7 +126,8 @@ def get_logger():
 
 
 def setup_logger(log_to_stdout=False):
-    fh = logging.FileHandler('graph//logs/' + multiprocessing.current_process().name + '_worker.log')
+    os.makedirs("output/logs", exist_ok=True)
+    fh = logging.FileHandler('output//logs/' + multiprocessing.current_process().name + '_worker.log', mode="w")
     fmt = logging.Formatter('%(asctime)-6s: %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(fmt)
 
