@@ -68,10 +68,10 @@ show_graph(instance, name, opt_sol.dag)
 
 See the `output/examples` folder for a demonstration.
 
-```
 ![Check out output/examples/ex_1.svg](output/examples/ex_1.svg)
-```
 
 In larger networks in can help to hide the underlying network and only look at the DAG of the optimal flow. See the `_before.svg` and `_after.svg` example in the examples folder for an illustration. Such a trimmed output can also be used to highlight the equal-splitting flow within the optimal DAG.
 
 ### Instance Inspection
+
+With the `save_instance` function any instance can be saved as a pickle for further analysis. Try `inspect_instance(1, "examples")` for a demonstration of an exemplary inspection pipeline.
