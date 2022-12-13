@@ -14,7 +14,7 @@ The framework offers many great features for analyzing routing problems empirica
 - Complete logging of all processes
 - Support for multiprocessing on multiple threads
 
-### Running a fully multi-threaded test is done in just four simple lines of code!
+#### Running a fully multi-threaded test is done in just four simple lines of code!
 
 ```python
 ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
@@ -26,6 +26,8 @@ ConjectureManager.register(MAIN_CONJECTURE,
 ig = InstanceGenerator(max_nodes=12, arbitrary_demands=True)
 run_multiprocessing_suite(ig, 8, 10000)
 ```
+
+This will run a test according to the specified parameters on 8 threads, each testing 10000 network instances.
 
 ## The Framework
 
@@ -50,5 +52,26 @@ LOADS_CONJECTURE.implies(MAIN_CONJECTURE)
 
 to denote the new assumption that the loads conjecture implies the main conjecture. This can be checked in the exact same way.
 
+## Usage
 
+As shown above, the tests can be customized and run in just four lines of code. Find those at the end of `main.py`. Instead of the multiprocessing, it is also possible to run a single threaded test with `run_single_test_suite(ig, num_of_tests)`. The checked conjectures and various settings can be adjusted in the `ConjectureManager`.
 
+### Visualization
+
+With a conversion to the DOT-graph format, the framework can output an image for every instance. The picture usually contains the network instance with sources marked in blue. Optionally, we can specify an optimal flow to be highlighted in the same network. It is then shown in green and node and edge loads are also indicated.
+
+The following code produces an image of the given instance with the given name and highlights the DAG of `opt_sol`. This will save the two files `<name>.svg` and `<name>` in the output directory. The latter contains the DOT-graph output.
+
+```python
+show_graph(instance, name, opt_sol.dag)
+```
+
+See the `output/examples` folder for a demonstration.
+
+```
+![Check out output/examples/ex_1.svg](output/examples/ex_1.svg)
+```
+
+In larger networks in can help to hide the underlying network and only look at the DAG of the optimal flow. See the `_before.svg` and `_after.svg` example in the examples folder for an illustration. Such a trimmed output can also be used to highlight the equal-splitting flow within the optimal DAG.
+
+### Instance Inspection
