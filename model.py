@@ -15,7 +15,7 @@ Solution = namedtuple("Solution", "dag, opt_congestion")
 ECMP_Sol = namedtuple("ECMP_Sol", "dag, congestion, loads")
 
 max_incoming_edges = 1000
-max_outgoing_edges = 2
+max_outgoing_edges = 1000
 
 
 def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
@@ -37,6 +37,9 @@ def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
                 edges[end].append(start)
                 num_ingoing_edges[start] += 1
                 num_outgoing_edges[end] += 1
+
+    # if any([num_ingoing_edges[i] > 2 * num_outgoing_edges[i] for i in range(num_nodes)]):
+    #     return build_random_DAG(num_nodes, prob_edge, arbitrary_demands)
 
     num_sources = random.randint(2, num_nodes - 2)
     sources = random.sample(range(1, num_nodes - 1), num_sources)
@@ -119,6 +122,19 @@ def compare_node_loads(ecmp_loads, opt_loads, sources):
         if a > 2 * b:
             return i
     return None
+
+
+def calculate_max_degree_ratio(dag: DAG):
+    in_degrees = [0] * dag.num_nodes
+    out_degrees = [0] * dag.num_nodes
+
+    for start in range(dag.num_nodes):
+        for end in dag.neighbors[start]:
+            out_degrees[start] += 1
+            in_degrees[end] += 1
+
+    return max([in_degrees[i] / out_degrees[i] for i in range(dag.num_nodes) if out_degrees[i] > 0])
+
 
 
 def get_logger():

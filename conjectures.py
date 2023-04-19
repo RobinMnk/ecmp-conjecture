@@ -57,6 +57,15 @@ MAIN_CONJECTURE = Conjecture(
 )
 
 
+DEGREE_RATIO_LEMMA = Conjecture(
+    "degree_ratio",
+    lambda opt_sol, ecmp_sols, inst: all(
+        ecmp_sols[i].congestion <= (1 + calculate_max_degree_ratio(opt_sol.dag)) * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
+    lambda opt_sol, ecmp_sols, inst:
+    f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\nMax Degree Ratio: {calculate_max_degree_ratio(inst)}"
+)
+
+
 def check_loads(opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], instance: Instance):
     optimal_loads = get_node_loads(opt_solution.dag, instance)
     return any([

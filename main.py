@@ -2,11 +2,13 @@ from multiprocessing import Process
 
 from model import *
 from optimal_solver import calculate_optimal_solution
-from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG
-from conjectures import MAIN_CONJECTURE, LOADS_CONJECTURE, Conjecture
+from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
+from conjectures import MAIN_CONJECTURE, LOADS_CONJECTURE, Conjecture, DEGREE_RATIO_LEMMA
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
 CHECK_ON_ALL_SUB_DAGS = 1
+CHECK_USING_SAME_DAG_AS_OPTIMAL = 2
+CHECK_USING_ORIGINAL_GRAPH = 3
 
 ECMP_FORWARDING = "ecmp"
 INTEGRAL_FORWARDING = "single_forwarding"
@@ -15,7 +17,7 @@ INTEGRAL_FORWARDING = "single_forwarding"
 class InstanceGenerator:
     def __init__(self, max_nodes: int, arbitrary_demands=True):
         if max_nodes > 20:
-            raise RuntimeWarning("The value for max_nodes is too large. Expect long runtime!")
+            raise RuntimeWarning("The value for max_nodes is too large. Expect (seriously) long runtime!")
 
         self.max_nodes = max_nodes
         self.arbitrary_demands = arbitrary_demands
@@ -75,6 +77,56 @@ class ConjectureManager:
         Conjecture.VERBOSE = verbose
         return solution
 
+
+    @classmethod
+    def _check_using_original_graph(cls, opt_solution: Solution, inst: Instance, index: int):
+        logger = get_logger()
+        ecmp_time, ecmp_solution = time_execution(get_ecmp_DAG, inst.dag, inst)
+        logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+
+        if not ecmp_solution:
+            show_graph(inst, f"ex_{index}", opt_solution.dag)
+            save_instance("failures", inst, index)
+            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+                         f"Check the failures/ex_{index} files. Exiting.")
+            exit(1)
+
+        verification_time, solution = time_execution(
+            cls._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
+        )
+
+        if solution:
+            logger.info(f"Verified all conjectures for ECMP on same DAG as optimal flow"
+                        f"\t{f'  ({verification_time:0.2f}s)' if verification_time > 1 else ''}")
+            return True
+
+        return False
+
+
+    @classmethod
+    def _check_using_same_dag(cls, opt_solution: Solution, inst: Instance, index: int):
+        logger = get_logger()
+        ecmp_time, ecmp_solution = time_execution(get_ecmp_DAG, opt_solution.dag, inst)
+        logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+
+        if not ecmp_solution:
+            show_graph(inst, f"ex_{index}", opt_solution.dag)
+            save_instance("failures", inst, index)
+            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+                         f"Check the failures/ex_{index} files. Exiting.")
+            exit(1)
+
+        verification_time, solution = time_execution(
+            cls._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
+        )
+
+        if solution:
+            logger.info(f"Verified all conjectures for ECMP on same DAG as optimal flow"
+                        f"\t{f'  ({verification_time:0.2f}s)' if verification_time > 1 else ''}")
+            return True
+
+        return False
+
     @classmethod
     def _check_on_optimal_only(cls, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
@@ -128,6 +180,10 @@ class ConjectureManager:
             return cls._check_on_optimal_only(opt_solution, inst, index)
         elif cls.checking_type == CHECK_ON_ALL_SUB_DAGS:
             return cls._check_on_all_sub_DAGs(opt_solution, inst, index)
+        elif cls.checking_type == CHECK_USING_SAME_DAG_AS_OPTIMAL:
+            return cls._check_using_same_dag(opt_solution, inst, index)
+        elif cls.checking_type == CHECK_USING_ORIGINAL_GRAPH:
+            return cls._check_using_original_graph(opt_solution, inst, index)
 
         raise RuntimeError("Invalid value for verification_type.")
 
@@ -145,7 +201,31 @@ def run_single_test_suite(generator: InstanceGenerator, num_iterations=100, show
             logger.error("=" * 50)
             logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
             logger.error("=" * 50)
+            logger.info(f"Check errors folder, instance {i}")
             exit(0)
+
+    logger.info("")
+    logger.info("=" * 40)
+    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
+    logger.info("=" * 40)
+
+    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
+
+
+def check_single_instance(inst: Instance, show_results=False, log_to_stdout=True):
+    setup_logger(log_to_stdout)
+    logger = get_logger()
+
+    logger.info("-" * 72)
+    id_ = random.randint(100, 10000)
+    logger.info(f"Checking Single Instance: (ID: {id_})")
+    success = ConjectureManager.verify_instance(inst, 1, show_results=show_results)
+    if not success:
+        logger.error("=" * 50)
+        logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
+        logger.error("=" * 50)
+        logger.info(f"Check errors folder, instance {id_}")
+        exit(0)
 
     logger.info("")
     logger.info("=" * 40)
@@ -178,20 +258,59 @@ def inspect_instance(inst_id: int, folder: str):
         show_graph(trimmed_inst, "_after", opt_sol.dag)
 
         print("Calculating ECMP opt_sol")
-        ecmp_sols: list[ECMP_Sol] = get_ALL_optimal_ECMP_sub_DAGs(opt_sol.dag, inst)
+        ecmp_sols: list[ECMP_Sol] = [ get_ecmp_DAG(opt_sol.dag, inst)]
         print(f"ECMP Congestion: {ecmp_sols[0].congestion}")
 
+        show_graph(trimmed_inst, "_ecmp", ecmp_sols[0].dag)
+
         factor = ecmp_sols[0].congestion / opt_sol.opt_congestion
-        print(f"Factor: {factor}")
+        print(f"Performance Ratio: {factor}")
+
+        print(f"1 + Max Degree Ratio = {1 + calculate_max_degree_ratio(ecmp_sols[0].dag)}")
 
         show_graph(trimmed_inst, "_ecmp", ecmp_sols[0].dag)
 
 
-if __name__ == '__main__':
-    ConjectureManager.setup(CHECK_ON_ALL_SUB_DAGS, ECMP_FORWARDING)
-    ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE), MAIN_CONJECTURE.implies(LOADS_CONJECTURE))
+def custom_instance():
+    num_nodes = 5
+    sources = [1, 2, 3, 4]
+    demands = [0.12, 2.07, 1.75, 0.76]
 
-    ig = InstanceGenerator(12, True)
-    # inspect_instance(1, "examples")
+    edges = {
+        0: [1, 4],
+        1: [0, 2, 3],
+        2: [1, 3],
+        3: [1, 2, 4],
+        4: [0, 3]
+    }
+
+    inst = Instance(DAG(num_nodes, edges), sources, 0, demands)
+
+    opt_sol = calculate_optimal_solution(inst)
+    print(f"Optimal Congestion: {opt_sol.opt_congestion:0.4f}")
+    show_graph(inst, "_opt", opt_sol.dag)
+
+    best_ecmp = get_optimal_ECMP_sub_DAG(opt_sol.dag, inst)
+    print(f"Best ECMP Congestion: {best_ecmp.congestion:0.4f}")
+    show_graph(inst, "_ecmp", opt_sol.dag)
+
+    return inst
+
+
+if __name__ == '__main__':
+    # custom_instance()
+    # inspect_instance(180, "errors_degree_ratio")
+
+    ConjectureManager.setup(CHECK_USING_SAME_DAG_AS_OPTIMAL, ECMP_FORWARDING)
+    ConjectureManager.register(MAIN_CONJECTURE, LOADS_CONJECTURE, LOADS_CONJECTURE.implies(MAIN_CONJECTURE), MAIN_CONJECTURE.implies(LOADS_CONJECTURE))
+    # ConjectureManager.register(DEGREE_RATIO_LEMMA)
+
+    inst = custom_instance()
+    check_single_instance(inst)
+
+    #
+    # ig = InstanceGenerator(12, True)
+    # # inspect_instance(1585, "errors_degree_ratio")
     # run_single_test_suite(ig, 2000)
-    run_multiprocessing_suite(ig, 8, 10000)
+    # run_multiprocessing_suite(ig, 8, 10000)
+
