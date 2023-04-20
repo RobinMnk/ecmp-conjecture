@@ -138,3 +138,11 @@ EDGE_LOAD_CONJECTURE = Conjecture(
                                      )
 
 )
+
+CONJECTURES_LIST = [
+    MAIN_CONJECTURE, DEGREE_RATIO_LEMMA, LOADS_CONJECTURE, EDGE_LOAD_CONJECTURE
+]
+
+ALL_CONJECTURES = {
+    c.name: c for c in CONJECTURES_LIST
+}

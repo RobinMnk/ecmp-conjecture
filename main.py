@@ -3,9 +3,8 @@ from multiprocessing import Process
 
 from dag_solver import optimal_solution_in_DAG
 from model import *
-# from optimal_solver import calculate_optimal_solution
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
-from conjectures import MAIN_CONJECTURE, LOADS_CONJECTURE, Conjecture, DEGREE_RATIO_LEMMA
+from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
 CHECK_ON_ALL_SUB_DAGS = 1
@@ -20,6 +19,7 @@ RESULT_SUCCESS = 0
 RESULT_COUNTEREXAMPLE = 1
 RESULT_INFEASIBLE = 2
 RESULT_ERROR = 3
+
 
 class InstanceGenerator:
     def __init__(self, max_nodes: int, arbitrary_demands=True):
@@ -50,49 +50,50 @@ class ConjectureManager:
     checking_type = CHECK_ON_OPTIMAL_SUB_DAGS_ONLY
     forwarding_type = ECMP_FORWARDING
     exit_on_counterexample = True
+    conjecture_ids = tuple()
 
-    @classmethod
-    def setup(cls,
-              checking_type=CHECK_ON_OPTIMAL_SUB_DAGS_ONLY,
-              forwarding_type=ECMP_FORWARDING,
-              exit_on_counterexample=True
-              ):
-        cls.checking_type = checking_type
-        cls.forwarding_type = forwarding_type
-        cls.exit_on_counterexample = exit_on_counterexample
+    def __init__(self,
+                 checking_type=CHECK_ON_OPTIMAL_SUB_DAGS_ONLY,
+                 forwarding_type=ECMP_FORWARDING,
+                 exit_on_counterexample=True
+                 ):
+        self.checking_type = checking_type
+        self.forwarding_type = forwarding_type
+        self.exit_on_counterexample = exit_on_counterexample
 
-    @classmethod
-    def register(cls, *conj):
-        cls.conjectures_to_check.extend(conj)
+    def register(self, *conj):
+        self.conjectures_to_check.extend(conj)
+        self.conjecture_ids = tuple(list(self.conjecture_ids) + [c.name for c in conj])
 
-    @classmethod
-    def get_settings(cls):
-        return f"-Conjectures: [{','.join(c.name for c in cls.conjectures_to_check)}]\n"\
-               f"-Checking Type: {CHECKING_TYPE_NAMES[cls.checking_type]}\n" \
-               f"-Forwarding Type: {cls.forwarding_type}\n"
+    def recover(self):
+        """ When passing the ConjectureManager Object to multiprocessing, the mutable list argument
+            conjectures_to_check is empty in the new processes. Therefore, when using multiple processes
+            we must recover the actual conjecture objects from their ids """
+        self.conjectures_to_check = [ALL_CONJECTURES[i] for i in self.conjecture_ids]
 
-    @classmethod
-    def _check_all_conjectures(cls, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance, index: int):
+    def __str__(self):
+        return f"-Conjectures: [{','.join(c.name for c in self.conjectures_to_check)}]\n"\
+               f"-Checking Type: {CHECKING_TYPE_NAMES[self.checking_type]}\n" \
+               f"-Forwarding Type: {self.forwarding_type}\n"
+
+    def _check_all_conjectures(self, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance, index: int):
         return all(
             conj.check(opt_solution, ecmp_solutions, inst, index)
-            for conj in cls.conjectures_to_check
+            for conj in self.conjectures_to_check
         )
 
-    @classmethod
-    def _check_conjectures_for_every_sub_DAG(cls, opt_solution: Solution, inst: Instance, index: int) -> ECMP_Sol:
+    def _check_conjectures_for_every_sub_DAG(self, opt_solution: Solution, inst: Instance, index: int) -> ECMP_Sol:
         solution = None
         verbose = Conjecture.VERBOSE
         Conjecture.VERBOSE = False
-        for sub_dag in iterate_sub_DAG(opt_solution.dag, mode=cls.forwarding_type):
+        for sub_dag in iterate_sub_DAG(opt_solution.dag, mode=self.forwarding_type):
             result = get_ecmp_DAG(sub_dag, inst)
-            if cls._check_all_conjectures(opt_solution, [result], inst, index):
+            if self._check_all_conjectures(opt_solution, [result], inst, index):
                 solution = result
         Conjecture.VERBOSE = verbose
         return solution
 
-
-    @classmethod
-    def _check_using_original_graph(cls, opt_solution: Solution, inst: Instance, index: int):
+    def _check_using_original_graph(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, ecmp_solution = time_execution(get_ecmp_DAG, inst.dag, inst)
         logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
@@ -105,7 +106,7 @@ class ConjectureManager:
             exit(1)
 
         verification_time, solution = time_execution(
-            cls._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
+            self._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
         )
 
         if solution:
@@ -115,9 +116,7 @@ class ConjectureManager:
 
         return RESULT_INFEASIBLE
 
-
-    @classmethod
-    def _check_using_same_dag(cls, opt_solution: Solution, inst: Instance, index: int):
+    def _check_using_same_dag(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, ecmp_solution = time_execution(get_ecmp_DAG, opt_solution.dag, inst)
         logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
@@ -130,7 +129,7 @@ class ConjectureManager:
             exit(1)
 
         verification_time, solution = time_execution(
-            cls._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
+            self._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
         )
 
         if solution:
@@ -140,8 +139,7 @@ class ConjectureManager:
 
         return RESULT_INFEASIBLE
 
-    @classmethod
-    def _check_on_optimal_only(cls, opt_solution: Solution, inst: Instance, index: int):
+    def _check_on_optimal_only(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
         ecmp_time, ecmp_solutions = time_execution(get_ALL_optimal_ECMP_sub_DAGs, opt_solution.dag, inst)
         logger.info(f"Calculated optimal ECMP sub-DAGs\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
@@ -154,7 +152,7 @@ class ConjectureManager:
             exit(1)
 
         verification_time, solution = time_execution(
-            cls._check_all_conjectures, opt_solution, ecmp_solutions, inst, index
+            self._check_all_conjectures, opt_solution, ecmp_solutions, inst, index
         )
 
         if solution:
@@ -164,10 +162,9 @@ class ConjectureManager:
 
         return RESULT_COUNTEREXAMPLE
 
-    @classmethod
-    def _check_on_all_sub_DAGs(cls, opt_solution: Solution, inst: Instance, index: int):
+    def _check_on_all_sub_DAGs(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
-        ecmp_time, solution = time_execution(cls._check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
+        ecmp_time, solution = time_execution(self._check_conjectures_for_every_sub_DAG, opt_solution, inst, index)
 
         if solution is not None:
             logger.info(f"Verified all conjectures across all sub-DAGs"
@@ -176,9 +173,13 @@ class ConjectureManager:
 
         return RESULT_COUNTEREXAMPLE
 
-    @classmethod
-    def verify_instance(cls, inst: Instance, index: int, show_results=False):
+    def verify_instance(self, inst: Instance, index: int, show_results=False):
         logger = get_logger()
+        if not self.conjectures_to_check:
+            print("No Conjectures to check")
+            logger.error("NO CONJECTURES TO CHECK!")
+            return RESULT_ERROR
+
         sol_time, opt_solution = time_execution(optimal_solution_in_DAG, inst)
         logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
 
@@ -189,41 +190,52 @@ class ConjectureManager:
         if show_results:
             show_graph(inst, f"output_{index}", opt_solution.dag)
 
-        if cls.checking_type == CHECK_ON_OPTIMAL_SUB_DAGS_ONLY:
-            return cls._check_on_optimal_only(opt_solution, inst, index)
-        elif cls.checking_type == CHECK_ON_ALL_SUB_DAGS:
-            return cls._check_on_all_sub_DAGs(opt_solution, inst, index)
-        elif cls.checking_type == CHECK_USING_SAME_DAG_AS_OPTIMAL:
-            return cls._check_using_same_dag(opt_solution, inst, index)
-        elif cls.checking_type == CHECK_USING_ORIGINAL_GRAPH:
-            return cls._check_using_original_graph(opt_solution, inst, index)
+        if self.checking_type == CHECK_ON_OPTIMAL_SUB_DAGS_ONLY:
+            return self._check_on_optimal_only(opt_solution, inst, index)
+        elif self.checking_type == CHECK_ON_ALL_SUB_DAGS:
+            return self._check_on_all_sub_DAGs(opt_solution, inst, index)
+        elif self.checking_type == CHECK_USING_SAME_DAG_AS_OPTIMAL:
+            return self._check_using_same_dag(opt_solution, inst, index)
+        elif self.checking_type == CHECK_USING_ORIGINAL_GRAPH:
+            return self._check_using_original_graph(opt_solution, inst, index)
 
         raise RuntimeError("Invalid value for verification_type.")
 
+    def write_run_to_log(self, success, max_num_nodes, start_time, instances_checked):
+        time_elapsed = time.time() - start_time
+        with open("output/runs.log", "a") as f:
+            f.write("-" * 17 + " Completed Run " + "-" * 17 + f"\n{datetime.now()}  ({time_elapsed:0.2f}s)\n")
+            f.write(str(self))
+            if success:
+                f.write(f"Verified in {instances_checked} feasible instances.\nLargest instance had {max_num_nodes} nodes.")
+            else:
+                f.write(f"COUNTEREXAMPLE found!\n")
 
-def write_run_to_log(success, start_time, instances_checked):
-    time_elapsed = time.time() - start_time
-    with open("output/runs.log", "a") as f:
-        f.write("-" * 17 + " Completed Run " + "-" * 17 + f"\n{datetime.now()}  (({time_elapsed:0.2f}s))\n")
-        f.write(ConjectureManager.get_settings())
-        if success:
-            f.write(f"Verified in {instances_checked} feasible instances.\n")
-        else:
-            f.write(f"COUNTEREXAMPLE found!\n")
 
 
-def run_single_test_suite(generator: InstanceGenerator, num_iterations=100, show_results=False, log_to_stdout=True):
+def run_single_test_suite(generator: InstanceGenerator,
+                          cm: ConjectureManager,
+                          num_iterations=100,
+                          show_results=False,
+                          log_to_stdout=True
+                          ):
     setup_logger(log_to_stdout)
     logger = get_logger()
 
-    run_started = time.time()
+    cm.recover()  # Only necessary when using multiprocessing to recover conjecture objects
+    logger.info(cm)
 
+    run_started = time.time()
     instances_checked = 0
+    max_num_nodes = 0
     for i in range(num_iterations):
         logger.info("-" * 72)
         logger.info(f"Begin Iteration {i + 1}:")
         inst = next(generator)
-        result = ConjectureManager.verify_instance(inst, i, show_results=show_results)
+        max_num_nodes = max(max_num_nodes, inst.dag.num_nodes)
+
+        result = cm.verify_instance(inst, i, show_results=show_results)
+
         if result == RESULT_SUCCESS:
             instances_checked += 1
         elif result == RESULT_COUNTEREXAMPLE:
@@ -232,15 +244,17 @@ def run_single_test_suite(generator: InstanceGenerator, num_iterations=100, show
             logger.error("=" * 50)
             logger.info(f"Check errors folder, instance {i}")
 
-            write_run_to_log(False, run_started, 0)
+            cm.write_run_to_log(False, max_num_nodes, run_started, 0)
             exit(0)
+        elif result == RESULT_ERROR:
+            exit(1)
 
     logger.info("")
     logger.info("=" * 40)
     logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
     logger.info("=" * 40)
 
-    write_run_to_log(True, run_started, instances_checked)
+    cm.write_run_to_log(True, max_num_nodes, run_started, instances_checked)
 
     print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
@@ -268,10 +282,10 @@ def check_single_instance(inst: Instance, show_results=False, log_to_stdout=True
     print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
 
-def run_multiprocessing_suite(generator: InstanceGenerator, num_processes, num_iterations):
+def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManager, num_processes, num_iterations):
     procs = []
     for i in range(min(num_processes, 8)):
-        proc = Process(target=run_single_test_suite, args=(generator, num_iterations, False, False))
+        proc = Process(target=run_single_test_suite, args=(generator, cm, num_iterations, False, False))
         procs.append(proc)
         proc.start()
 
@@ -351,12 +365,11 @@ def new_test():
 
 
 if __name__ == '__main__':
-    ConjectureManager.setup(CHECK_ON_OPTIMAL_SUB_DAGS_ONLY, ECMP_FORWARDING)
-    ConjectureManager.register(MAIN_CONJECTURE)
-    # ConjectureManager.register(DEGREE_RATIO_LEMMA)
+    cm = ConjectureManager(CHECK_ON_OPTIMAL_SUB_DAGS_ONLY, ECMP_FORWARDING)
+    cm.register(MAIN_CONJECTURE)
 
-    ig = InstanceGenerator(30, False)
+    ig = InstanceGenerator(25, False)
     # inspect_instance(149, "errors_congestion")
-    run_single_test_suite(ig, 1000)
-    # run_multiprocessing_suite(ig, 8, 10000)
+    # run_single_test_suite(ig, 1000)
+    run_multiprocessing_suite(ig, cm, 8, 2000)
 
