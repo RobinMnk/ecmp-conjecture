@@ -1,22 +1,18 @@
 import itertools
-from typing import NewType
 
 import more_itertools
 import copy
 
-from conjectures import Conjecture, MAIN_CONJECTURE, LOADS_CONJECTURE
 from model import *
 
 
 def get_ecmp_DAG(dag: DAG, inst: Instance) -> ECMP_Sol:
-    node_val = [0] * inst.dag.num_nodes
-    for s, d in zip(inst.sources, inst.demands):
-        node_val[s] = d
-
-    edges = defaultdict(lambda: defaultdict(int))
+    node_val = [d for d in inst.demands]
+    edges = defaultdict(lambda: defaultdict(float))
+    parents = defaultdict(list)
 
     congestion = 0
-    for node in topologicalSort(dag):
+    for node in reversed(range(1, inst.dag.num_nodes)):  # topologicalSort(dag):
         degree = len(dag.neighbors[node])
         if degree > 0:
             value = node_val[node] / degree
@@ -24,8 +20,9 @@ def get_ecmp_DAG(dag: DAG, inst: Instance) -> ECMP_Sol:
                 node_val[nb] += value
                 congestion = max(congestion, value)
                 edges[node][nb] += value
+                parents[nb].append(node)
 
-    return ECMP_Sol(DAG(dag.num_nodes, edges), congestion, node_val)
+    return ECMP_Sol(DAG(dag.num_nodes, edges, parents), congestion, node_val)
 
 
 def _get_removable_edges(dag: DAG):

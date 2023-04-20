@@ -9,7 +9,7 @@ from collections import namedtuple, defaultdict
 import random
 import graphviz
 
-DAG = namedtuple("DAG", "num_nodes, neighbors")
+DAG = namedtuple("DAG", "num_nodes, neighbors, parents")
 Instance = namedtuple("Instance", "dag, sources, target, demands")
 Solution = namedtuple("Solution", "dag, opt_congestion")
 ECMP_Sol = namedtuple("ECMP_Sol", "dag, congestion, loads")
@@ -20,31 +20,25 @@ max_outgoing_edges = 1000
 
 def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
     edges = defaultdict(list)
+    parents = defaultdict(list)
     num_ingoing_edges = [0] * num_nodes
     num_outgoing_edges = [0] * num_nodes
 
-    for start in range(num_nodes):
-        for end in range(start + 1, num_nodes):
+    for start in range(1, num_nodes):
+        for end in range(max(0, start - num_nodes // 3), start):
             if random.random() < prob_edge \
                     and num_ingoing_edges[end] < max_incoming_edges \
                     and num_outgoing_edges[start] < max_outgoing_edges:
                 edges[start].append(end)
+                parents[end].append(start)
                 num_ingoing_edges[end] += 1
                 num_outgoing_edges[start] += 1
-            if random.random() < prob_edge \
-                    and num_ingoing_edges[start] < max_incoming_edges \
-                    and num_outgoing_edges[end] < max_outgoing_edges:
-                edges[end].append(start)
-                num_ingoing_edges[start] += 1
-                num_outgoing_edges[end] += 1
 
-    # if any([num_ingoing_edges[i] > 2 * num_outgoing_edges[i] for i in range(num_nodes)]):
-    #     return build_random_DAG(num_nodes, prob_edge, arbitrary_demands)
-
-    num_sources = random.randint(2, num_nodes - 2)
+    num_sources = random.randint(2, num_nodes // 2)
     sources = random.sample(range(1, num_nodes - 1), num_sources)
-    demands = [random.randint(1, num_nodes) for _ in range(len(sources))] if arbitrary_demands else [1] * len(sources)
-    return Instance(DAG(num_nodes, edges), sources, 0, demands)
+    demands = [(random.randint(1, num_nodes) if i in sources else 0) for i in range(num_nodes)]\
+        if arbitrary_demands else [1 if i in sources else 0 for i in range(num_nodes)]
+    return Instance(DAG(num_nodes, edges, parents), sources, 0, demands)
 
 
 def topologicalSortUtil(dag: DAG, node: int, visited, stack):
@@ -94,14 +88,14 @@ def get_edge_loads(dag: DAG):
 def instance_to_dot(instance: Instance, solution: DAG = None):
     dot = graphviz.Digraph('ecmp-test', comment='ECMP Test')
     dot.node(str(0), "target", color="red")
-    node_loads = get_node_loads(solution, instance)
+    node_loads = instance.demands #  [0] * instance.dag.num_nodes #  get_node_loads(solution, instance)
     for node in range(1, instance.dag.num_nodes):
-        if len(instance.dag.neighbors[node]) > 0:
+        if len(instance.dag.neighbors[node]) + len(instance.dag.parents[node]) > 0:
             load_label = f"{node_loads[node]:.2f}".rstrip("0").rstrip(".")
             dot.node(str(node), str(node), color="blue" if node in instance.sources else "black", xlabel=load_label)
 
             for nb in instance.dag.neighbors[node]:
-                sol_val = solution.neighbors[node]
+                sol_val = solution.neighbors[node] if solution is not None else []
                 part_of_solution = nb in sol_val
                 edge_color = "green" if part_of_solution else "black"
                 label = f"{sol_val[nb]:.3f}".rstrip("0").rstrip(".") if part_of_solution else None
@@ -113,7 +107,7 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
 def show_graph(instance: Instance, name: str, solution: DAG = None):
     dot_source = instance_to_dot(instance, solution)
     s = graphviz.Source(dot_source, filename=f"output/{name}", format="svg")
-    s.render(engine="circo")
+    s.render() #  engine="circo")
 
 
 def compare_node_loads(ecmp_loads, opt_loads, sources):
