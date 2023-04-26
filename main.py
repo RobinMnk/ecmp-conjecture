@@ -63,6 +63,8 @@ class ConjectureManager:
 
     def register(self, *conj):
         self.conjectures_to_check.extend(conj)
+
+        # This needs to be a tuples, so it is always serializable
         self.conjecture_ids = tuple(list(self.conjecture_ids) + [c.name for c in conj])
 
     def recover(self):
@@ -205,12 +207,11 @@ class ConjectureManager:
         time_elapsed = time.time() - start_time
         with open("output/runs.log", "a") as f:
             f.write("-" * 17 + " Completed Run " + "-" * 17 + f"\n{datetime.now()}  ({time_elapsed:0.2f}s)\n")
+            f.write(f"=== Result: {'SUCCESS' if success else 'COUNTEREXAMPLE FOUND'}! ===\n")
             f.write(str(self))
             if success:
-                f.write(f"Verified in {instances_checked} feasible instances.\nLargest instance had {max_num_nodes} nodes.")
-            else:
-                f.write(f"COUNTEREXAMPLE found!\n")
-
+                f.write(f"Verified {instances_checked} feasible instances.\n")
+            f.write(f"Largest instance had {max_num_nodes} nodes.\n")
 
 
 def run_single_test_suite(generator: InstanceGenerator,
@@ -259,14 +260,14 @@ def run_single_test_suite(generator: InstanceGenerator,
     print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
 
-def check_single_instance(inst: Instance, show_results=False, log_to_stdout=True):
+def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=False, log_to_stdout=True):
     setup_logger(log_to_stdout)
     logger = get_logger()
 
     logger.info("-" * 72)
     id_ = random.randint(100, 10000)
     logger.info(f"Checking Single Instance: (ID: {id_})")
-    success = ConjectureManager.verify_instance(inst, 1, show_results=show_results)
+    success = cm.verify_instance(inst, 1, show_results=show_results)
     if not success:
         logger.error("=" * 50)
         logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
@@ -370,6 +371,6 @@ if __name__ == '__main__':
 
     ig = InstanceGenerator(25, False)
     # inspect_instance(149, "errors_congestion")
-    # run_single_test_suite(ig, 1000)
-    run_multiprocessing_suite(ig, cm, 8, 2000)
+    # run_single_test_suite(ig, cm, 1000)
+    run_multiprocessing_suite(ig, cm, 8, 5000)
 
