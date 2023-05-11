@@ -25,6 +25,8 @@ def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
     num_ingoing_edges = [0] * num_nodes
     num_outgoing_edges = [0] * num_nodes
 
+    # Enforces that all edges go from larger indices to lower indices
+    # n -> 0 is always a topological ordering
     for start in range(1, num_nodes):
         for end in range(max(0, 0), start):  #  - num_nodes // 3
             if random.random() < prob_edge \
@@ -91,7 +93,7 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
     dot.node(str(0), "target", color="red")
     node_loads = instance.demands  # [0] * instance.dag.num_nodes #  get_node_loads(solution, instance)
     for node in range(1, instance.dag.num_nodes):
-        if True or len(instance.dag.neighbors[node]) + len(instance.dag.parents[node]) > 0:
+        if len(instance.dag.neighbors[node]) + len(instance.dag.parents[node]) > 0:
             load_label = f"{node_loads[node]:.2f}".rstrip("0").rstrip(".") if node_loads[node] > 0 else ""
             dot.node(str(node), str(node), color="blue" if node in instance.sources else "black", xlabel=load_label)
 

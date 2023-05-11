@@ -51,7 +51,7 @@ class Conjecture:
 MAIN_CONJECTURE = Conjecture(
     "congestion",
     lambda opt_sol, ecmp_sols, _: all(
-        ecmp_sols[i].congestion < 2 * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
+        ecmp_sols[i].congestion <= 2 * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
     lambda opt_sol, ecmp_sols, _:
     f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\n"
 )
