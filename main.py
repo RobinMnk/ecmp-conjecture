@@ -2,6 +2,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 from dag_solver import optimal_solution_in_DAG
+from matchings.main_mtg import run
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
 from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES
@@ -35,7 +36,7 @@ class InstanceGenerator:
 
     def __next__(self):
         size = random.randint(4, self.max_nodes)
-        prob = random.random() * 0.7 + 0.1
+        prob = random.random() * 0.5 + 0.1
         logger = get_logger()
         logger.info(f"Building Instance on {size} nodes with edge probability {prob:0.3f}")
         inst = build_random_DAG(size, prob, self.arbitrary_demands)
@@ -64,7 +65,7 @@ class ConjectureManager:
     def register(self, *conj):
         self.conjectures_to_check.extend(conj)
 
-        # This needs to be a tuples, so it is always serializable
+        # This needs to be a tuple, so it is always serializable
         self.conjecture_ids = tuple(list(self.conjecture_ids) + [c.name for c in conj])
 
     def recover(self):
@@ -204,14 +205,15 @@ class ConjectureManager:
         raise RuntimeError("Invalid value for verification_type.")
 
     def write_run_to_log(self, success, max_num_nodes, start_time, instances_checked):
-        time_elapsed = time.time() - start_time
-        with open("output/runs.log", "a") as f:
-            f.write("-" * 17 + " Completed Run " + "-" * 17 + f"\n{datetime.now()}  ({time_elapsed:0.2f}s)\n")
-            f.write(f"=== Result: {'SUCCESS' if success else 'COUNTEREXAMPLE FOUND'}! ===\n")
-            f.write(str(self))
-            if success:
-                f.write(f"Verified {instances_checked} feasible instances.\n")
-            f.write(f"Largest instance had {max_num_nodes} nodes.\n")
+        if instances_checked > 0:
+            time_elapsed = time.time() - start_time
+            with open("output/runs.log", "a") as f:
+                f.write("-" * 17 + " Completed Run " + "-" * 17 + f"\n{datetime.now()}  ({time_elapsed:0.2f}s)\n")
+                f.write(f"=== Result: {'SUCCESS' if success else 'COUNTEREXAMPLE FOUND'}! ===\n")
+                f.write(str(self))
+                if success:
+                    f.write(f"Verified {instances_checked} feasible instances.\n")
+                f.write(f"Largest instance had {max_num_nodes} nodes.\n")
 
 
 def run_single_test_suite(generator: InstanceGenerator,
@@ -344,6 +346,7 @@ def custom_instance():
 
     return inst
 
+
 def new_test():
     inst = build_random_DAG(50, 0.6, False)
 
@@ -369,8 +372,8 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_ON_OPTIMAL_SUB_DAGS_ONLY, ECMP_FORWARDING)
     cm.register(MAIN_CONJECTURE)
 
-    ig = InstanceGenerator(25, False)
+    ig = InstanceGenerator(20, False)
     # inspect_instance(149, "errors_congestion")
-    # run_single_test_suite(ig, cm, 1000)
-    run_multiprocessing_suite(ig, cm, 8, 5000)
+    run_single_test_suite(ig, cm, 100)
+    # run_multiprocessing_suite(ig, cm, 8, 5000)
 

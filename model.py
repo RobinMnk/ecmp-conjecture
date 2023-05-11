@@ -11,6 +11,7 @@ import graphviz
 
 DAG = namedtuple("DAG", "num_nodes, neighbors, parents")
 Instance = namedtuple("Instance", "dag, sources, target, demands")
+InstanceMTG = namedtuple("Instance", "n, m, edges, parents, top_loads, out_degrees")
 Solution = namedtuple("Solution", "dag, opt_congestion")
 ECMP_Sol = namedtuple("ECMP_Sol", "dag, congestion, loads")
 
@@ -25,7 +26,7 @@ def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
     num_outgoing_edges = [0] * num_nodes
 
     for start in range(1, num_nodes):
-        for end in range(max(0, start - num_nodes // 3), start):
+        for end in range(max(0, 0), start):  #  - num_nodes // 3
             if random.random() < prob_edge \
                     and num_ingoing_edges[end] < max_incoming_edges \
                     and num_outgoing_edges[start] < max_outgoing_edges:
@@ -34,8 +35,8 @@ def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
                 num_ingoing_edges[end] += 1
                 num_outgoing_edges[start] += 1
 
-    num_sources = random.randint(2, num_nodes // 2)
-    sources = random.sample(range(1, num_nodes - 1), num_sources)
+    num_sources = random.randint(1, num_nodes-2)
+    sources = random.sample(range(1, num_nodes), num_sources)
     demands = [(random.randint(1, num_nodes) if i in sources else 0) for i in range(num_nodes)]\
         if arbitrary_demands else [1 if i in sources else 0 for i in range(num_nodes)]
     return Instance(DAG(num_nodes, edges, parents), sources, 0, demands)
@@ -88,15 +89,15 @@ def get_edge_loads(dag: DAG):
 def instance_to_dot(instance: Instance, solution: DAG = None):
     dot = graphviz.Digraph('ecmp-test', comment='ECMP Test')
     dot.node(str(0), "target", color="red")
-    node_loads = instance.demands #  [0] * instance.dag.num_nodes #  get_node_loads(solution, instance)
+    node_loads = instance.demands  # [0] * instance.dag.num_nodes #  get_node_loads(solution, instance)
     for node in range(1, instance.dag.num_nodes):
-        if len(instance.dag.neighbors[node]) + len(instance.dag.parents[node]) > 0:
-            load_label = f"{node_loads[node]:.2f}".rstrip("0").rstrip(".")
+        if True or len(instance.dag.neighbors[node]) + len(instance.dag.parents[node]) > 0:
+            load_label = f"{node_loads[node]:.2f}".rstrip("0").rstrip(".") if node_loads[node] > 0 else ""
             dot.node(str(node), str(node), color="blue" if node in instance.sources else "black", xlabel=load_label)
 
             for nb in instance.dag.neighbors[node]:
                 sol_val = solution.neighbors[node] if solution is not None else []
-                part_of_solution = nb in sol_val
+                part_of_solution = nb in sol_val and sol_val[nb] > 0
                 edge_color = "green" if part_of_solution else "black"
                 label = f"{sol_val[nb]:.3f}".rstrip("0").rstrip(".") if part_of_solution else None
                 dot.edge(str(node), str(nb), color=edge_color, label=label)
