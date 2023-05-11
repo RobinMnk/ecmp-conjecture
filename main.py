@@ -6,8 +6,8 @@ from dag_solver import optimal_solution_in_DAG
 from matchings.main_mtg import run
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
-from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES
-from my_ecmp import solve
+from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES, error_folder
+from my_ecmp import MySolver
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
 CHECK_ON_ALL_SUB_DAGS = 1
@@ -130,11 +130,12 @@ class ConjectureManager:
         logger = get_logger()
 
         try:
-            ecmp_time, ecmp_solution = time_execution(solve, opt_solution.dag, inst, opt_solution.opt_congestion)
+            solver = MySolver()
+            ecmp_time, ecmp_solution = time_execution(solver.solve, opt_solution.dag, inst, opt_solution.opt_congestion)
             logger.info(f"Calculated ECMP solution with my Algorithm\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
             if not ecmp_solution:
-                show_graph(inst, f"ex_{index}", opt_solution.dag)
+                # show_graph(inst, f"ex_{index}", opt_solution.dag)
                 save_instance("failures", inst, index)
                 logger.error("There was an error. The ECMP solution could be calculated. "
                              f"Check the failures/ex_{index} files. Exiting.")
@@ -152,13 +153,13 @@ class ConjectureManager:
         except Exception as e:
             print(e)
             traceback.print_exc()
-            show_graph(inst, f"ex_{index}", opt_solution.dag)
+            # show_graph(inst, f"ex_{index}", opt_solution.dag)
             save_instance("failures", inst, index)
             logger.error("There was an error. The ECMP solution could be calculated. "
                          f"Check the failures/ex_{index} files. Exiting.")
             exit(1)
 
-        return RESULT_INFEASIBLE
+        return RESULT_COUNTEREXAMPLE
 
     def _check_using_same_dag(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
@@ -181,7 +182,7 @@ class ConjectureManager:
                         f"\t{f'  ({verification_time:0.2f}s)' if verification_time > 1 else ''}")
             return RESULT_SUCCESS
 
-        return RESULT_INFEASIBLE
+        return RESULT_COUNTEREXAMPLE
 
     def _check_on_optimal_only(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
@@ -341,7 +342,8 @@ def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManage
 
 def inspect_instance(inst_id: int, folder: str):
 
-    random.seed(0)
+    # random.seed(9115232)  # errors_congestion 448
+    random.seed(1)
 
     with open(f"output/{folder}/ex_{inst_id}.pickle", "rb") as f:
         inst = pickle.load(f)
@@ -351,7 +353,8 @@ def inspect_instance(inst_id: int, folder: str):
         trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
         show_graph(trimmed_inst, "_trimmed", opt_sol.dag)
 
-        ecmp_sol = solve(opt_sol.dag, inst, opt_sol.opt_congestion)
+        sv = MySolver()
+        ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
         show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
@@ -426,7 +429,7 @@ if __name__ == '__main__':
     cm.register(MAIN_CONJECTURE)
 
     # ig = InstanceGenerator(20, False)
-    inspect_instance(90, "errors_congestion")
+    inspect_instance(306, "failures")  # error_folder(MAIN_CONJECTURE))
     # run_single_test_suite(ig, cm, 1000)
     # run_multiprocessing_suite(ig, cm, 8, 5000)
 

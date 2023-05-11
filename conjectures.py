@@ -146,3 +146,8 @@ CONJECTURES_LIST = [
 ALL_CONJECTURES = {
     c.name: c for c in CONJECTURES_LIST
 }
+
+
+def error_folder(conj: Conjecture):
+    return f"errors_{conj.name}"
+
