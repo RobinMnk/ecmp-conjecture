@@ -344,7 +344,7 @@ def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManage
 
 def inspect_instance(inst_id: int, folder: str):
 
-    # random.seed(9115232)  # errors_congestion 448
+    # random.seed(9115232)  # errors_congestion_old 448
     random.seed(1194660667223394089)  # 328
     random.seed(11108484738710341480)  # 3126
     random.seed(5950291163594365085)  # failures 286
@@ -429,11 +429,12 @@ def new_test():
 
 
 if __name__ == '__main__':
-    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
+    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    # ig = InstanceGenerator(20, False)
-    inspect_instance(360, "failures") #  error_folder(MAIN_CONJECTURE))
+    # ig = InstanceGenerator(25, False)
+    inspect_instance(1, "tmp") #  error_folder(MAIN_CONJECTURE))
     # run_single_test_suite(ig, cm, 10000)
+
     # run_multiprocessing_suite(ig, cm, 8, 5000)
 
