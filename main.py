@@ -3,7 +3,6 @@ from datetime import datetime
 from multiprocessing import Process
 
 from dag_solver import optimal_solution_in_DAG
-from matchings.main_mtg import run
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
 from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES, error_folder
@@ -36,6 +35,9 @@ class InstanceGenerator:
         random_bytes = os.urandom(8)
         seed = int.from_bytes(random_bytes, byteorder="big")
         random.seed(seed)
+        logger = get_logger()
+        logger.info(f"Used Seed: {seed}")
+        print(f"Used Seed: {seed}")
 
     def __next__(self):
         size = random.randint(4, self.max_nodes)
@@ -110,7 +112,7 @@ class ConjectureManager:
         if not ecmp_solution:
             show_graph(inst, f"ex_{index}", opt_solution.dag)
             save_instance("failures", inst, index)
-            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+            logger.error("There was an error. The optimal ECMP solution could not be calculated. "
                          f"Check the failures/ex_{index} files. Exiting.")
             exit(1)
 
@@ -137,7 +139,7 @@ class ConjectureManager:
             if not ecmp_solution:
                 # show_graph(inst, f"ex_{index}", opt_solution.dag)
                 save_instance("failures", inst, index)
-                logger.error("There was an error. The ECMP solution could be calculated. "
+                logger.error("There was an error. The ECMP solution could not be calculated. "
                              f"Check the failures/ex_{index} files. Exiting.")
                 exit(1)
 
@@ -155,7 +157,7 @@ class ConjectureManager:
             traceback.print_exc()
             # show_graph(inst, f"ex_{index}", opt_solution.dag)
             save_instance("failures", inst, index)
-            logger.error("There was an error. The ECMP solution could be calculated. "
+            logger.error("There was an error. The ECMP solution could not be calculated. "
                          f"Check the failures/ex_{index} files. Exiting.")
             exit(1)
 
@@ -169,7 +171,7 @@ class ConjectureManager:
         if not ecmp_solution:
             show_graph(inst, f"ex_{index}", opt_solution.dag)
             save_instance("failures", inst, index)
-            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+            logger.error("There was an error. The optimal ECMP solution could not be calculated. "
                          f"Check the failures/ex_{index} files. Exiting.")
             exit(1)
 
@@ -192,7 +194,7 @@ class ConjectureManager:
         if not ecmp_solutions:
             show_graph(inst, f"ex_{index}", opt_solution.dag)
             save_instance("failures", inst, index)
-            logger.error("There was an error. The optimal ECMP solution could be calculated. "
+            logger.error("There was an error. The optimal ECMP solution could not be calculated. "
                          f"Check the failures/ex_{index} files. Exiting.")
             exit(1)
 
@@ -343,7 +345,9 @@ def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManage
 def inspect_instance(inst_id: int, folder: str):
 
     # random.seed(9115232)  # errors_congestion 448
-    random.seed(1)
+    random.seed(1194660667223394089)  # 328
+    random.seed(11108484738710341480)  # 3126
+    random.seed(5950291163594365085)  # failures 286
 
     with open(f"output/{folder}/ex_{inst_id}.pickle", "rb") as f:
         inst = pickle.load(f)
@@ -355,7 +359,7 @@ def inspect_instance(inst_id: int, folder: str):
 
         sv = MySolver()
         ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
-        show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
+        # show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
 
@@ -429,7 +433,7 @@ if __name__ == '__main__':
     cm.register(MAIN_CONJECTURE)
 
     # ig = InstanceGenerator(20, False)
-    inspect_instance(306, "failures")  # error_folder(MAIN_CONJECTURE))
-    # run_single_test_suite(ig, cm, 1000)
+    inspect_instance(360, "failures") #  error_folder(MAIN_CONJECTURE))
+    # run_single_test_suite(ig, cm, 10000)
     # run_multiprocessing_suite(ig, cm, 8, 5000)
 
