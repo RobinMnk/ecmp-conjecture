@@ -34,18 +34,19 @@ class MySolver:
     def does_need_repackaging(self, node):
         return node > 0 and math.ceil(self.loads[node] / (alpha * self.OPT)) < len(self.active_edges[node])
 
-    def has_path_to_violated(self, a):
-        if any(v in self.active_edges[a] for v in self.violated_nodes):
+    def has_path_to_violated(self, a, active_edges_only=True):
+        if a in self.violated_nodes:  # or any(v in self.active_edges[a] for v in self.violated_nodes):
             return True
         else:
-            return any(self.has_path_to_violated(nb) for nb in self.active_edges[a])
+            edge_set = self.active_edges if active_edges_only else self.dag.neighbors
+            return any(self.has_path_to_violated(nb) for nb in edge_set[a])
 
     def get_active_nodes(self):
         """ can (and should) be maintained automatically, this version is very inefficient """
         return [
             node for node in range(1, self.dag.num_nodes)
             # if any(not self.has_path_to_violated(nb, self.active_edges) for nb in self.dag.neighbors[node]) and
-            if self.has_path_to_violated(node)
+            if self.has_path_to_violated(node) and node not in self.violated_nodes
         ]
 
     def propagate(self, node, change):
@@ -145,7 +146,7 @@ class MySolver:
             #     self.violated_nodes.remove(v)
             #     continue
             iteration_count += 1
-            if iteration_count == 200:
+            if iteration_count == 50:
                 print("ERROR: DAUERSCHLEIFE!!!!")
                 self.show()
                 save_instance("tmp", self.inst, 1)
@@ -155,7 +156,7 @@ class MySolver:
             candidate_edges = [
                 (node, nb) for node in active_nodes for nb in self.dag.neighbors[node]
                 if nb not in self.active_edges[node]
-                and not self.has_path_to_violated(nb)
+                and not self.has_path_to_violated(nb, active_edges_only=False)
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
@@ -171,7 +172,13 @@ class MySolver:
 
             # Delete edge on path to v
             # neighbor_to_delete = random.choice(list(x for x in self.active_edges[start] if (start, x) not in candidate_edges))
-            neighbor_to_delete = list(x for x in self.active_edges[start] if (start, x) not in candidate_edges)[0]
+
+            relief_edges = [
+                x for x in self.active_edges[start]
+                if (start, x) not in candidate_edges
+                and self.has_path_to_violated(x, active_edges_only=False)
+            ]
+            neighbor_to_delete = relief_edges[0]
             self.active_edges[start].remove(neighbor_to_delete)
             # self.propagate(neighbor_to_delete, -volume)
 

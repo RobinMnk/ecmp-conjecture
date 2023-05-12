@@ -432,9 +432,9 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    # ig = InstanceGenerator(25, False)
-    inspect_instance(1, "tmp") #  error_folder(MAIN_CONJECTURE))
-    # run_single_test_suite(ig, cm, 10000)
+    ig = InstanceGenerator(40, False)
+    # inspect_instance(1, "tmp") #  error_folder(MAIN_CONJECTURE))
+    run_single_test_suite(ig, cm, 10000)
 
     # run_multiprocessing_suite(ig, cm, 8, 5000)
 
