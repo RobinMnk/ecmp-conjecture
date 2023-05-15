@@ -18,6 +18,8 @@ ECMP_Sol = namedtuple("ECMP_Sol", "dag, congestion, loads")
 max_incoming_edges = 1000
 max_outgoing_edges = 1000
 
+_eps = 0.00000001
+
 
 def build_random_DAG(num_nodes, prob_edge, arbitrary_demands=False):
     edges = defaultdict(list)

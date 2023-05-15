@@ -3,7 +3,7 @@ import random
 import traceback
 
 from ecmp import get_ecmp_DAG
-from model import DAG, Instance, show_graph, save_instance
+from model import DAG, Instance, show_graph, save_instance, _eps
 
 alpha = 2
 
@@ -18,7 +18,6 @@ def path_to(a, b, active_edges):
                 return [b] + p
         return []
 
-_eps = 0.000001
 
 class MySolver:
     dag = None

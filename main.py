@@ -466,8 +466,8 @@ if __name__ == '__main__':
 
     # custom_instance()
 
-    # ig = InstanceGenerator(100, False)
-    inspect_instance(9012, error_folder(MAIN_CONJECTURE))
+    ig = InstanceGenerator(300, False)
+    # inspect_instance(9012, error_folder(MAIN_CONJECTURE))
     # inspect_instance(1, "tmp")
-    # run_single_test_suite(ig, cm, 1000)
+    run_single_test_suite(ig, cm, 1000)
     # run_multiprocessing_suite(ig, cm, 8, 10000)
