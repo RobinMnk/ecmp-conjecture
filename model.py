@@ -56,6 +56,14 @@ def topologicalSortUtil(dag: DAG, node: int, visited, stack):
     stack.append(node)
 
 
+def make_parents(neighbors):
+    parents = [[] for _ in range(len(neighbors))]
+    for i, nbs in enumerate(neighbors):
+        for nb in nbs:
+            parents[nb].append(i)
+    return parents
+
+
 def topologicalSort(dag: DAG):
     visited = [False] * dag.num_nodes
     stack = []

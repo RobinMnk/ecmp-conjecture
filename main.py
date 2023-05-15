@@ -283,17 +283,18 @@ def run_single_test_suite(generator: InstanceGenerator,
         logger.info("-" * 72)
         logger.info(f"Begin Iteration {i + 1}:")
         inst = next(generator)
-        max_num_nodes = max(max_num_nodes, inst.dag.num_nodes)
 
         result = cm.verify_instance(inst, i, show_results=show_results)
 
         if result == RESULT_SUCCESS:
             instances_checked += 1
+            max_num_nodes = max(max_num_nodes, inst.dag.num_nodes)
         elif result == RESULT_COUNTEREXAMPLE:
             logger.error("=" * 50)
             logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
             logger.error("=" * 50)
             logger.info(f"Check errors folder, instance {i}")
+            max_num_nodes = max(max_num_nodes, inst.dag.num_nodes)
 
             cm.write_run_to_log(False, max_num_nodes, run_started, 0)
             exit(0)
@@ -317,8 +318,8 @@ def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=Fa
     logger.info("-" * 72)
     id_ = random.randint(100, 10000)
     logger.info(f"Checking Single Instance: (ID: {id_})")
-    success = cm.verify_instance(inst, 1, show_results=show_results)
-    if not success:
+    result = cm.verify_instance(inst, 1, show_results=show_results)
+    if result == RESULT_COUNTEREXAMPLE:
         logger.error("=" * 50)
         logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
         logger.error("=" * 50)
@@ -427,24 +428,19 @@ def new_test():
         print("Infeasible Model")
 
 
-def check_test_cases():
+def check_test_cases(cm):
     directory = "output/failures"
     inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
     for inst_id in sorted(inst_ids, reverse=True):
         print(f"-- Checking Test: ex_{inst_id} --")
-        inspect_instance(inst_id, "failures")
-        print()
+        inst = None
+        with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
+            inst = pickle.load(f)
+
+        check_single_instance(inst, cm, False, False)
 
 
-def make_parents(neighbors):
-    parents = [list() for _ in range(len(neighbors))]
-    for i, nbs in enumerate(neighbors):
-        for nb in nbs:
-            parents[nb].append(i)
-    return parents
-
-
-def custom_instance():
+def custom_instance2():
     neighbors = [
         [], [0], [0], [0], [0], [0], [1,2,3,4,5], [6], [6]
     ]
@@ -459,15 +455,15 @@ def custom_instance():
 
 
 if __name__ == '__main__':
-    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
+    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
-    # check_test_cases()
+    # check_test_cases(cm)
 
     # custom_instance()
 
-    ig = InstanceGenerator(300, False)
+    ig = InstanceGenerator(200, False)
     # inspect_instance(9012, error_folder(MAIN_CONJECTURE))
     # inspect_instance(1, "tmp")
-    run_single_test_suite(ig, cm, 1000)
-    # run_multiprocessing_suite(ig, cm, 8, 10000)
+    # run_single_test_suite(ig, cm, 1000)
+    run_multiprocessing_suite(ig, cm, 8, 10000)
