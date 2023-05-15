@@ -18,7 +18,7 @@ def path_to(a, b, active_edges):
                 return [b] + p
         return []
 
-
+_eps = 0.000001
 
 class MySolver:
     dag = None
@@ -27,6 +27,8 @@ class MySolver:
     loads = list()
     active_edges = list()
     violated_nodes = list()
+    marked = list()
+    removed = list()
 
     def is_node_violated(self, node):
         return node > 0 and self.loads[node] > alpha * self.OPT * len(self.dag.neighbors[node])
@@ -41,12 +43,23 @@ class MySolver:
             edge_set = self.active_edges if active_edges_only else self.dag.neighbors
             return any(self.has_path_to_violated(nb) for nb in edge_set[a])
 
+    def has_inactive_path_below(self, a, thresh):
+        if a < thresh:
+            return True
+        else:
+            return any(
+                self.has_inactive_path_below(nb, thresh) for nb in self.dag.neighbors[a]
+                if nb not in self.active_edges[a]
+                and nb not in self.violated_nodes
+                )
+
     def get_active_nodes(self):
         """ can (and should) be maintained automatically, this version is very inefficient """
         return [
             node for node in range(1, self.dag.num_nodes)
             # if any(not self.has_path_to_violated(nb, self.active_edges) for nb in self.dag.neighbors[node]) and
-            if self.has_path_to_violated(node) and node not in self.violated_nodes
+            if (self.has_path_to_violated(node) or any(node == x for (x, _) in self.marked))
+            and node not in self.violated_nodes
         ]
 
     def propagate(self, node, change):
@@ -123,10 +136,13 @@ class MySolver:
                     return
 
             elif num_packets < old_degree:
-                smallest_neighbor = min(self.active_edges[node])
-                self.active_edges[node].remove(smallest_neighbor)
-                self.update_loads(end)
-                return
+                candidates = [e for e in self.active_edges[node] if (node, e) not in self.marked]
+                if candidates:
+                    smallest_neighbor = min(candidates)
+                    self.active_edges[node].remove(smallest_neighbor)
+                    self.removed.append((node, smallest_neighbor))
+                    self.update_loads(end)
+                    return
 
     def show(self):
         # self.update_loads(0)
@@ -135,10 +151,53 @@ class MySolver:
         sol = get_ecmp_DAG(dag, self.inst)
         show_graph(trimmed_inst, "_ecmp", sol.dag)
 
-    def fixup(self, current):
 
+    def apply_candidate_edge_rebalancing(self, edge, candidate_edges):
+        start, end = edge
+        # volume = self.loads[start] / len(self.active_edges[start])
+        # print(f" - rebalancing with edge ({start}, {end})")
+
+        # Delete edge on path to v
+        # neighbor_to_delete = random.choice(list(x for x in self.active_edges[start] if (start, x) not in candidate_edges))
+
+        # if edge in removed_edges:
+        #     self.marked.append((start, neighbor_to_delete))
+        # else:
+
+        if edge in self.removed:
+            self.marked.append(edge)
+        else:
+            relief_edges = [
+                x for x in self.active_edges[start]
+                if (start, x) not in candidate_edges
+                   and self.has_path_to_violated(x, active_edges_only=False)
+            ]
+            # new_relief_edges = [e for e in relief_edges if e not in removed_edges]
+            # if len(new_relief_edges) == 0:
+            #     # No other way -> split
+            #     shared_neighbor = relief_edges[0]
+            #     self.marked.append((start, shared_neighbor))
+            #     self.marked.append(edge)
+            # else:
+            if len(relief_edges) == 0:
+                return False
+
+            neighbor_to_delete = relief_edges[0]
+            self.active_edges[start].remove(neighbor_to_delete)
+            self.removed.append((start, neighbor_to_delete))
+
+        # self.propagate(neighbor_to_delete, -volume)
+
+        # Activate candidate edge
+        self.active_edges[start].append(end)
+        # self.propagate(end, volume)+
+        return True
+
+
+    def fixup(self, current):
         iteration_count = 0
         self.violated_nodes = [current]
+        self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
             # v = random.choice(self.violated_nodes)
@@ -146,48 +205,51 @@ class MySolver:
             #     self.violated_nodes.remove(v)
             #     continue
             iteration_count += 1
-            if iteration_count == 50:
-                print("ERROR: DAUERSCHLEIFE!!!!")
+            if iteration_count == 10 * self.dag.num_nodes:
                 self.show()
                 save_instance("tmp", self.inst, 1)
-                exit(1)
+                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
+
+            # print(self.violated_nodes)
 
             active_nodes = self.get_active_nodes()
             candidate_edges = [
                 (node, nb) for node in active_nodes for nb in self.dag.neighbors[node]
                 if nb not in self.active_edges[node]
-                and not self.has_path_to_violated(nb, active_edges_only=False)
+                and (nb not in self.violated_nodes or (node, nb) in self.marked)
+                # and not self.has_path_to_violated(nb, active_edges_only=False)
+                # and self.has_inactive_path_below(nb, min(self.violated_nodes))
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
-                self.show()
-                raise RuntimeError(f"No Candidate Edges during fixup for nodes {self.violated_nodes}")
+                # print("Resetting violated node set")
+                self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
+                continue
+                # self.show()
+                # save_instance("tmp", self.inst, 1)
+                # raise RuntimeError(f"No Candidate Edges during fixup for nodes {self.violated_nodes}")
 
-            candidate_edges.sort(key=lambda x: x[1])
+            candidate_edges.sort(key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]]) if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes, reverse=True)
+
+            # candidate_edges.sort(key=lambda x: x[1], reverse=False)
 
             edge = candidate_edges[0]
-            start, end = edge
-            # volume = self.loads[start] / len(self.active_edges[start])
-            print(f" - rebalancing with edge ({start}, {end})")
 
-            # Delete edge on path to v
-            # neighbor_to_delete = random.choice(list(x for x in self.active_edges[start] if (start, x) not in candidate_edges))
+            while not self.apply_candidate_edge_rebalancing(edge, candidate_edges):
+                candidate_edges.remove(edge)
+                if not candidate_edges:
+                    # print("Resetting violated node set")
+                    self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
+                    edge = None
+                    break
+                edge = candidate_edges[0]
 
-            relief_edges = [
-                x for x in self.active_edges[start]
-                if (start, x) not in candidate_edges
-                and self.has_path_to_violated(x, active_edges_only=False)
-            ]
-            neighbor_to_delete = relief_edges[0]
-            self.active_edges[start].remove(neighbor_to_delete)
-            # self.propagate(neighbor_to_delete, -volume)
+            if edge is None:
+                continue
 
-            # Activate candidate edge
-            self.active_edges[start].append(end)
-            # self.propagate(end, volume)+
             candidate_edges.remove(edge)
-
             self.update_loads(current)
+
             # self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
 
         #     new_violated_nodes = []
@@ -211,7 +273,7 @@ class MySolver:
 
         if num_packets > degree:
             # Call Fixup Routine!
-            print(f" Calling fixup for node {node}")
+            # print(f" Calling fixup for node {node}")
             self.fixup(node)
             num_packets = math.ceil(self.loads[node] / (alpha * self.OPT))
 
@@ -225,10 +287,11 @@ class MySolver:
     def solve(self, dag: DAG, inst: Instance, OPT):
         self.dag = dag
         self.inst = inst
-        self.OPT = OPT
+        self.OPT = OPT + _eps
         self.loads = [ld for ld in inst.demands]
         self.active_edges = [list() for _ in range(dag.num_nodes)]
         self.violated_nodes.clear()
+        self.marked = list()
 
         for node in reversed(list(range(1, dag.num_nodes))):
             self.process_node(node)
@@ -236,13 +299,15 @@ class MySolver:
         self.update_loads(0)
 
         # self.show()
+        #
+        # print(f"marked: {self.marked}")
 
         try:
             congestion = max(self.loads[i] / len(self.active_edges[i]) for i in range(1, dag.num_nodes) if self.loads[i] > 0)
 
-            print(f"ECMP Congestion:  {congestion}")
+            # print(f"ECMP Congestion:  {congestion}")
 
-            if congestion > 2 * OPT:
+            if congestion > 2 * self.OPT:
                 print("ERROR: COUNTEREXAMPLE!!!!")
                 self.show()
                 save_instance("tmp", inst, 1)

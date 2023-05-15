@@ -13,7 +13,8 @@ CHECK_ON_ALL_SUB_DAGS = 1
 CHECK_USING_SAME_DAG_AS_OPTIMAL = 2
 CHECK_USING_ORIGINAL_GRAPH = 3
 CHECK_WITH_MY_ALGORITHM = 4
-CHECKING_TYPE_NAMES = ["CHECK_ON_OPTIMAL_SUB_DAGS_ONLY", "CHECK_ON_ALL_SUB_DAGS", "CHECK_USING_SAME_DAG_AS_OPTIMAL", "CHECK_USING_ORIGINAL_GRAPH", "CHECK_WITH_MY_ALGORITHM"]
+CHECKING_TYPE_NAMES = ["CHECK_ON_OPTIMAL_SUB_DAGS_ONLY", "CHECK_ON_ALL_SUB_DAGS", "CHECK_USING_SAME_DAG_AS_OPTIMAL",
+                       "CHECK_USING_ORIGINAL_GRAPH", "CHECK_WITH_MY_ALGORITHM"]
 
 ECMP_FORWARDING = "ecmp"
 INTEGRAL_FORWARDING = "single_forwarding"
@@ -26,8 +27,8 @@ RESULT_ERROR = 3
 
 class InstanceGenerator:
     def __init__(self, max_nodes: int, arbitrary_demands=True):
-        if max_nodes >= 50:
-            raise RuntimeWarning("The value for max_nodes is too large. Expect (seriously) long runtime!")
+        # if max_nodes >= 50:
+        #     raise RuntimeWarning("The value for max_nodes is too large. Expect (seriously) long runtime!")
 
         self.max_nodes = max_nodes
         self.arbitrary_demands = arbitrary_demands
@@ -83,11 +84,12 @@ class ConjectureManager:
         self.conjectures_to_check = [ALL_CONJECTURES[i] for i in self.conjecture_ids]
 
     def __str__(self):
-        return f"-Conjectures: [{','.join(c.name for c in self.conjectures_to_check)}]\n"\
+        return f"-Conjectures: [{','.join(c.name for c in self.conjectures_to_check)}]\n" \
                f"-Checking Type: {CHECKING_TYPE_NAMES[self.checking_type]}\n" \
                f"-Forwarding Type: {self.forwarding_type}\n"
 
-    def _check_all_conjectures(self, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance, index: int):
+    def _check_all_conjectures(self, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance,
+                               index: int):
         return all(
             conj.check(opt_solution, ecmp_solutions, inst, index)
             for conj in self.conjectures_to_check
@@ -127,14 +129,14 @@ class ConjectureManager:
 
         return RESULT_INFEASIBLE
 
-
     def _check_with_my_algorithm(self, opt_solution: Solution, inst: Instance, index: int):
         logger = get_logger()
 
         try:
             solver = MySolver()
             ecmp_time, ecmp_solution = time_execution(solver.solve, opt_solution.dag, inst, opt_solution.opt_congestion)
-            logger.info(f"Calculated ECMP solution with my Algorithm\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
+            logger.info(
+                f"Calculated ECMP solution with my Algorithm\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
             if not ecmp_solution:
                 # show_graph(inst, f"ex_{index}", opt_solution.dag)
@@ -343,7 +345,6 @@ def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManage
 
 
 def inspect_instance(inst_id: int, folder: str):
-
     # random.seed(9115232)  # errors_congestion_old 448
     random.seed(1194660667223394089)  # 328
     random.seed(11108484738710341480)  # 3126
@@ -361,8 +362,6 @@ def inspect_instance(inst_id: int, folder: str):
         ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
         # show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
-
-
 
         # trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
         # show_graph(trimmed_inst, "_after", opt_sol.dag)
@@ -428,13 +427,47 @@ def new_test():
         print("Infeasible Model")
 
 
+def check_test_cases():
+    directory = "output/failures"
+    inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
+    for inst_id in sorted(inst_ids, reverse=True):
+        print(f"-- Checking Test: ex_{inst_id} --")
+        inspect_instance(inst_id, "failures")
+        print()
+
+
+def make_parents(neighbors):
+    parents = [list() for _ in range(len(neighbors))]
+    for i, nbs in enumerate(neighbors):
+        for nb in nbs:
+            parents[nb].append(i)
+    return parents
+
+
+def custom_instance():
+    neighbors = [
+        [], [0], [0], [0], [0], [0], [1,2,3,4,5], [6], [6]
+    ]
+
+    parents = make_parents(neighbors)
+    dag = DAG(len(neighbors), neighbors, parents)
+    sources = list(range(1, len(neighbors) + 1))
+    demands = [0] + [1] * (len(neighbors) - 1)
+    inst = Instance(dag, sources, 0, demands)
+    save_instance("failures", inst, 4000)
+
+
+
 if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    ig = InstanceGenerator(40, False)
-    # inspect_instance(1, "tmp") #  error_folder(MAIN_CONJECTURE))
-    run_single_test_suite(ig, cm, 10000)
+    # check_test_cases()
 
-    # run_multiprocessing_suite(ig, cm, 8, 5000)
+    # custom_instance()
 
+    # ig = InstanceGenerator(100, False)
+    inspect_instance(9012, error_folder(MAIN_CONJECTURE))
+    # inspect_instance(1, "tmp")
+    # run_single_test_suite(ig, cm, 1000)
+    # run_multiprocessing_suite(ig, cm, 8, 10000)

@@ -112,7 +112,6 @@ def show_graph(instance: Instance, name: str, solution: DAG = None):
     s = graphviz.Source(dot_source, filename=f"output/{name}", format="svg")
     s.render() #  engine="circo")
 
-
 def compare_node_loads(ecmp_loads, opt_loads, sources):
     for i, (a, b) in enumerate(zip(ecmp_loads, opt_loads)):
         # if i in sources and a > 2 * b:
