@@ -301,6 +301,11 @@ def run_single_test_suite(generator: InstanceGenerator,
         elif result == RESULT_ERROR:
             exit(1)
 
+        if i % 500 == 0 and i > 0:
+            print(f" - {multiprocessing.current_process().name} at iteration {i} / {num_iterations}\n"
+                  f" - - Elapsed Time: {time.time() - run_started:0.2f}s\n"
+                  f" - - Feasible Instances verified: {instances_checked}")
+
     logger.info("")
     logger.info("=" * 40)
     logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
@@ -461,9 +466,9 @@ if __name__ == '__main__':
     # check_test_cases(cm)
 
     # custom_instance()
-
-    ig = InstanceGenerator(200, False)
-    # inspect_instance(9012, error_folder(MAIN_CONJECTURE))
+    #
+    ig = InstanceGenerator(100, False)
+    # inspect_instance(764, "failures") #  error_folder(MAIN_CONJECTURE))
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 1000)
-    run_multiprocessing_suite(ig, cm, 8, 10000)
+    run_multiprocessing_suite(ig, cm, 8, 1000)
