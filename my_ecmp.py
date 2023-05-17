@@ -86,7 +86,8 @@ class MySolver:
         self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
-            # print(self.violated_nodes, self.removed, self.marked)
+            print(self.violated_nodes, self.removed, self.marked)
+            # print(self.violated_nodes)
 
             active_nodes = self.get_active_nodes()
             candidate_edges = [
@@ -95,57 +96,25 @@ class MySolver:
                 and nb not in self.violated_nodes
             ]  # all inactive edges leaving an active node
 
-
-            # problematic = [
-            #     v for v in active_nodes for nb in self.active_edges[v]
-            #     if len(self.active_edges[v]) > 1
-            #     and self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps
-            #     # and (v, nb) not in self.marked
-            # ]
-            # if len(problematic) > 0:
-            #     # if any(self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps for v in active_nodes
-            #     #        if len(self.active_edges[v]) > 1 and (v,_) not in self.marked):
-            #     print("ERROR")
-            #     print(list(f"{self.loads[v] / len(self.active_edges[v])} {self.OPT * alpha / 2 + _eps}   {v}        " for v in active_nodes if len(self.active_edges[v]) > 1))
-            #     save_instance("tmp", self.inst, 1)
-            #     self.show()
-            #
-            #     if all((v, nb) in self.marked for v in problematic for nb in self.active_edges[v]):
-            #         print("SECOND CHECK PASSED!!!")
-            #     else:
-            #         raise RuntimeError("second test failed")
-
-
             if not candidate_edges:
                 # print("Resetting violated node set")
                 shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
                 if len(shrunk_violated) < len(self.violated_nodes):
                     self.violated_nodes = shrunk_violated
+                    self.marked = []
                     continue
+
 
                 save_instance("tmp", self.inst, 1)
                 raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
-            #
-            #     # Endless loop!
-            #     demands = sum(self.inst.demands[d] for d in active_nodes) + sum(self.inst.demands[x] for x in self.violated_nodes)
-            #     degrees = sum(len(self.dag.neighbors[d]) for d in self.violated_nodes)
-            #     bottleneck = 2 / (1 + (self.OPT * degrees / demands))
-            #     print(f"Increasing Alpha:  {alpha:0.4f}  ->  {bottleneck:0.4f}")
-            #
-            #     if alpha == bottleneck:
-            #         save_instance("tmp", self.inst, 2)
-            #         raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
-            #
-            #     alpha = bottleneck
-            #     self.marked = []
-            #     self.update_loads(current)
-            #     continue
 
             # Heuristic for better distribution
             candidate_edges.sort(key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]]) if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes, reverse=True)
 
             edge = candidate_edges[0]
             start, end = edge
+
+            # print(f" - Rebalancing with edge ({start}, {end})")
 
             if edge in self.removed:
                 self.marked.append(edge)
