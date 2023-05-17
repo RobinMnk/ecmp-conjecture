@@ -436,13 +436,15 @@ def check_test_cases(cm):
     directory = "output/failures"
     inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
     for inst_id in sorted(inst_ids):
-        print(f"-- Checking Test: ex_{inst_id} --")
+        print(f"-- Checking Test ex_{inst_id}:  \t", end="")
         inst = None
         with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
             inst = pickle.load(f)
 
         if not check_single_instance(inst, cm, False, False):
             exit(1)
+
+        print("PASSED! -- ")
 
     logger = get_logger()
     logger.info("")
@@ -472,9 +474,9 @@ if __name__ == '__main__':
     cm.register(MAIN_CONJECTURE)
     check_test_cases(cm)
 
-    ig = InstanceGenerator(200, False)
+    # ig = InstanceGenerator(1000, True)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(4000, "failures")
+    # inspect_instance(666, "failures")
     # inspect_instance(1, "tmp")
-    run_single_test_suite(ig, cm, 1000)
-    # run_multiprocessing_suite(ig, cm, 8, 30000)
+    # run_single_test_suite(ig, cm, 1000)
+    # run_multiprocessing_suite(ig, cm, 8, 10000)

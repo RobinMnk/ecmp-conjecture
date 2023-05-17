@@ -82,19 +82,10 @@ class MySolver:
         show_graph(trimmed_inst, "_ecmp", sol.dag)
 
     def fixup(self, current):
-        iteration_count = 0
         self.violated_nodes = [current]
         self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
-            iteration_count += 1
-            if iteration_count > self.dag.num_nodes * 100:
-                save_instance("tmp", self.inst, 1)
-                raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
-
-            # print(self.violated_nodes, self.removed, self.marked)
-            # print(self.violated_nodes)
-
             active_nodes = self.get_active_nodes()
             candidate_edges = [
                 (node, nb) for node in active_nodes for nb in self.dag.neighbors[node]
@@ -109,13 +100,10 @@ class MySolver:
                     self.violated_nodes = shrunk_violated
                     continue
 
-                self.marked = []
-                continue
+                save_instance("tmp", self.inst, 1)
+                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
 
-                # save_instance("tmp", self.inst, 1)
-                # raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
-
-            # Heuristic for better distribution
+            # Necessary for better distribution
             edge = min(candidate_edges,
                        key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]])
                        if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes)
