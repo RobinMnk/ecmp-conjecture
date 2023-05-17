@@ -107,16 +107,18 @@ class MySolver:
                 shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
                 if len(shrunk_violated) < len(self.violated_nodes):
                     self.violated_nodes = shrunk_violated
-                    self.marked = []
                     continue
 
-                save_instance("tmp", self.inst, 1)
-                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
+                self.marked = []
+                continue
+
+                # save_instance("tmp", self.inst, 1)
+                # raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
 
             # Heuristic for better distribution
-            candidate_edges.sort(key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]]) if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes, reverse=True)
-
-            edge = candidate_edges[0]
+            edge = min(candidate_edges,
+                       key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]])
+                       if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes)
             start, end = edge
 
             if edge in self.removed:
