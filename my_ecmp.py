@@ -49,7 +49,7 @@ class MySolver:
         dag = DAG(self.dag.num_nodes, self.active_edges, [])
         sol = get_ecmp_DAG(dag, self.inst)
         self.loads = [ld for ld in sol.loads]
-        for node in reversed(range(end+1, dag.num_nodes)):
+        for node in reversed(range(end, dag.num_nodes)):
             if node in self.violated_nodes:
                 continue
 
@@ -82,11 +82,17 @@ class MySolver:
         show_graph(trimmed_inst, "_ecmp", sol.dag)
 
     def fixup(self, current):
+        iteration_count = 0
         self.violated_nodes = [current]
         self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
-            print(self.violated_nodes, self.removed, self.marked)
+            iteration_count += 1
+            if iteration_count > self.dag.num_nodes * 100:
+                save_instance("tmp", self.inst, 1)
+                raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+
+            # print(self.violated_nodes, self.removed, self.marked)
             # print(self.violated_nodes)
 
             active_nodes = self.get_active_nodes()
@@ -104,7 +110,6 @@ class MySolver:
                     self.marked = []
                     continue
 
-
                 save_instance("tmp", self.inst, 1)
                 raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
 
@@ -113,8 +118,6 @@ class MySolver:
 
             edge = candidate_edges[0]
             start, end = edge
-
-            # print(f" - Rebalancing with edge ({start}, {end})")
 
             if edge in self.removed:
                 self.marked.append(edge)
@@ -149,8 +152,9 @@ class MySolver:
         # activate highest num_packets out-edges in top. order
         for neighbor in list(reversed(self.dag.neighbors[node]))[:num_packets]:
             # Activate edge node -> neighbor
-            self.active_edges[node].append(neighbor)
-            self.loads[neighbor] += self.loads[node] / num_packets
+            if neighbor not in self.active_edges[node]:
+                self.active_edges[node].append(neighbor)
+                self.loads[neighbor] += self.loads[node] / num_packets
 
     def solve(self, dag: DAG, inst: Instance, OPT):
         self.dag = dag

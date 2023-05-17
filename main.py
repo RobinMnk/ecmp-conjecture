@@ -329,14 +329,10 @@ def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=Fa
         logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
         logger.error("=" * 50)
         logger.info(f"Check errors folder, instance {id_}")
-        exit(0)
+        return False
 
-    logger.info("")
-    logger.info("=" * 40)
-    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
-    logger.info("=" * 40)
+    return True
 
-    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
 
 
 def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManager, num_processes, num_iterations):
@@ -368,6 +364,9 @@ def inspect_instance(inst_id: int, folder: str):
         ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
         show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
+
+        if ecmp_sol.congestion > 2 * opt_sol.opt_congestion:
+            raise Exception("Conjecture violated!")
 
         # trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
         # show_graph(trimmed_inst, "_after", opt_sol.dag)
@@ -436,14 +435,20 @@ def new_test():
 def check_test_cases(cm):
     directory = "output/failures"
     inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
-    for inst_id in sorted(inst_ids, reverse=True):
+    for inst_id in sorted(inst_ids):
         print(f"-- Checking Test: ex_{inst_id} --")
         inst = None
         with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
             inst = pickle.load(f)
 
-        check_single_instance(inst, cm, False, False)
+        if not check_single_instance(inst, cm, False, False):
+            exit(1)
 
+    logger = get_logger()
+    logger.info("")
+    logger.info("=" * 40)
+    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
+    logger.info("=" * 40)
 
 def custom_instance2():
     neighbors = [
@@ -463,13 +468,13 @@ def custom_instance2():
 
 
 if __name__ == '__main__':
-    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
+    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
+    check_test_cases(cm)
 
-    # check_test_cases(cm)
-
-    ig = InstanceGenerator(100, False)
-    inspect_instance(1, error_folder(MAIN_CONJECTURE))
+    ig = InstanceGenerator(200, False)
+    # inspect_instance(1, error_folder(MAIN_CONJECTURE))
+    # inspect_instance(4000, "failures")
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 1000)
-    # run_multiprocessing_suite(ig, cm, 8, 30000)
+    run_multiprocessing_suite(ig, cm, 8, 30000)
