@@ -30,9 +30,6 @@ class MySolver:
     def is_node_violated(self, node):
         return node > 0 and self.loads[node] > alpha * self.OPT * len(self.dag.neighbors[node])
 
-    def does_need_repackaging(self, node):
-        return node > 0 and math.ceil(self.loads[node] / (alpha * self.OPT)) < len(self.active_edges[node])
-
     def has_path_to_violated(self, a, active_edges_only=True):
         if a in self.violated_nodes:  # or any(v in self.active_edges[a] for v in self.violated_nodes):
             return True
@@ -40,18 +37,7 @@ class MySolver:
             edge_set = self.active_edges if active_edges_only else self.dag.neighbors
             return any(self.has_path_to_violated(nb) for nb in edge_set[a])
 
-    def has_inactive_path_below(self, a, thresh):
-        if a < thresh:
-            return True
-        else:
-            return any(
-                self.has_inactive_path_below(nb, thresh) for nb in self.dag.neighbors[a]
-                if nb not in self.active_edges[a]
-                and nb not in self.violated_nodes
-                )
-
     def get_active_nodes(self):
-        """ can (and should) be maintained automatically, this version is very inefficient """
         return [
             node for node in range(1, self.dag.num_nodes)
             if self.has_path_to_violated(node)
@@ -59,10 +45,11 @@ class MySolver:
         ]
 
     def update_loads(self, end):
+        """ loads can (and should) be maintained automatically, this version is very inefficient """
         dag = DAG(self.dag.num_nodes, self.active_edges, [])
         sol = get_ecmp_DAG(dag, self.inst)
         self.loads = [ld for ld in sol.loads]
-        for node in reversed(range(end, dag.num_nodes)):
+        for node in reversed(range(end+1, dag.num_nodes)):
             if node in self.violated_nodes:
                 continue
 
@@ -95,17 +82,11 @@ class MySolver:
         show_graph(trimmed_inst, "_ecmp", sol.dag)
 
     def fixup(self, current):
-        iteration_count = 0
         self.violated_nodes = [current]
         self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
-            iteration_count += 1
-            if iteration_count > 10 * self.dag.num_nodes:
-                save_instance("tmp", self.inst, 1)
-                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
-
-            # print(self.violated_nodes)
+            # print(self.violated_nodes, self.removed, self.marked)
 
             active_nodes = self.get_active_nodes()
             candidate_edges = [
@@ -114,47 +95,51 @@ class MySolver:
                 and nb not in self.violated_nodes
             ]  # all inactive edges leaving an active node
 
-            # xx = sum(len([x for x in self.active_edges[d] if x not in active_nodes]) for d in active_nodes)
-            # print(xx)
-            # print(sum(self.inst.demands[d] for d in active_nodes) / (alpha + self.OPT) + len(active_nodes))
-            # if not xx <= sum(self.inst.demands[d] for d in active_nodes) / (alpha + self.OPT) + len(active_nodes):
+
+            # problematic = [
+            #     v for v in active_nodes for nb in self.active_edges[v]
+            #     if len(self.active_edges[v]) > 1
+            #     and self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps
+            #     # and (v, nb) not in self.marked
+            # ]
+            # if len(problematic) > 0:
+            #     # if any(self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps for v in active_nodes
+            #     #        if len(self.active_edges[v]) > 1 and (v,_) not in self.marked):
             #     print("ERROR")
+            #     print(list(f"{self.loads[v] / len(self.active_edges[v])} {self.OPT * alpha / 2 + _eps}   {v}        " for v in active_nodes if len(self.active_edges[v]) > 1))
             #     save_instance("tmp", self.inst, 1)
             #     self.show()
-            #     exit(1)
+            #
+            #     if all((v, nb) in self.marked for v in problematic for nb in self.active_edges[v]):
+            #         print("SECOND CHECK PASSED!!!")
+            #     else:
+            #         raise RuntimeError("second test failed")
 
-            if len([
-                (v, nb) for v in active_nodes for nb in self.active_edges[v]
-                if len(self.active_edges[v]) > 1
-                and self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps
-                and (v, nb) not in self.marked
-            ]) > 0:
-                # if any(self.loads[v] / len(self.active_edges[v]) < self.OPT * alpha / 2 + _eps for v in active_nodes
-                #        if len(self.active_edges[v]) > 1 and (v,_) not in self.marked):
-                print("ERROR")
-                print(list(f"{self.loads[v] / len(self.active_edges[v])} {self.OPT * alpha / 2 + _eps}   {v}        " for v in active_nodes if len(self.active_edges[v]) > 1))
-                save_instance("tmp", self.inst, 1)
-                self.show()
-                exit(1)
-
-
-            # y = len(x for x in range(1, self.dag.num_nodes) if )
-
-            # d_A = sum(self.inst.demands[d] for d in active_nodes)
-            # d_x = sum(self.inst.demands[x] for x in self.violated_nodes)
-            # if not len(active_nodes) < (1 - 1/alpha) * (d_A + d_x) / self.OPT:
-            #     print("EROORRRR")
-            #     print(d_A)
-            #     print(d_x)
-            #     print(len(active_nodes))
-            #     print(self.OPT)
-            #     print((1 - 1/alpha) * (d_A + d_x) / self.OPT)
-            #     exit(1)
 
             if not candidate_edges:
                 # print("Resetting violated node set")
-                self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
-                continue
+                shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
+                if len(shrunk_violated) < len(self.violated_nodes):
+                    self.violated_nodes = shrunk_violated
+                    continue
+
+                save_instance("tmp", self.inst, 1)
+                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
+            #
+            #     # Endless loop!
+            #     demands = sum(self.inst.demands[d] for d in active_nodes) + sum(self.inst.demands[x] for x in self.violated_nodes)
+            #     degrees = sum(len(self.dag.neighbors[d]) for d in self.violated_nodes)
+            #     bottleneck = 2 / (1 + (self.OPT * degrees / demands))
+            #     print(f"Increasing Alpha:  {alpha:0.4f}  ->  {bottleneck:0.4f}")
+            #
+            #     if alpha == bottleneck:
+            #         save_instance("tmp", self.inst, 2)
+            #         raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
+            #
+            #     alpha = bottleneck
+            #     self.marked = []
+            #     self.update_loads(current)
+            #     continue
 
             # Heuristic for better distribution
             candidate_edges.sort(key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]]) if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes, reverse=True)
@@ -195,7 +180,6 @@ class MySolver:
         # activate highest num_packets out-edges in top. order
         for neighbor in list(reversed(self.dag.neighbors[node]))[:num_packets]:
             # Activate edge node -> neighbor
-            # if neighbor not in self.active_edges[node]:
             self.active_edges[node].append(neighbor)
             self.loads[neighbor] += self.loads[node] / num_packets
 

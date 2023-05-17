@@ -366,7 +366,7 @@ def inspect_instance(inst_id: int, folder: str):
 
         sv = MySolver()
         ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
-        # show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
+        show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
         # trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
@@ -447,15 +447,18 @@ def check_test_cases(cm):
 
 def custom_instance2():
     neighbors = [
-        [], [0], [0], [0], [0], [0], [1,2,3,4,5], [6], [6]
+        [], [0], [0], [1, 2], [3], [0], [0], [0], [5, 6, 7], [8], [8], [8], [8], [3]
     ]
 
     parents = make_parents(neighbors)
     dag = DAG(len(neighbors), neighbors, parents)
-    sources = list(range(1, len(neighbors) + 1))
-    demands = [0] + [1] * (len(neighbors) - 1)
+    sources = [3,4,9,10,11,12, 13]
+    demands = [0,0,0,1,1,0,0,0,0,1,1,1,1, 1]
+    # sources = list(range(1, len(neighbors) + 1))
+    # demands = [0] + [1] * (len(neighbors) - 1)
     inst = Instance(dag, sources, 0, demands)
-    save_instance("failures", inst, 4000)
+    save_instance("failures", inst, 7000)
+    show_graph(inst, "_tricky")
 
 
 
@@ -463,12 +466,8 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
-    # check_test_cases(cm)
-
-    # custom_instance()
-    #
     ig = InstanceGenerator(100, False)
-    # inspect_instance(764, "failures") #  error_folder(MAIN_CONJECTURE))
-    # inspect_instance(1, "tmp")
+    # inspect_instance(4000, "failures") #  error_folder(MAIN_CONJECTURE))
+    inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 1000)
-    run_multiprocessing_suite(ig, cm, 8, 1000)
+    # run_multiprocessing_suite(ig, cm, 8, 3000)
