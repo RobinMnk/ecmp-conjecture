@@ -472,11 +472,13 @@ def custom_instance2():
 if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
+
     check_test_cases(cm)
 
-    # ig = InstanceGenerator(1000, True)
+    ig = InstanceGenerator(100, True)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(666, "failures")
+    # inspect_instance(2916, "failures")
     # inspect_instance(1, "tmp")
-    # run_single_test_suite(ig, cm, 1000)
-    # run_multiprocessing_suite(ig, cm, 8, 10000)
+    # run_single_test_suite(ig, cm, 10000)
+    run_multiprocessing_suite(ig, cm, 8, 3000)
+

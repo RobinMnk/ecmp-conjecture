@@ -94,7 +94,7 @@ class MySolver:
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
-                # print("Resetting violated node set")
+                # Resetting violated node set
                 shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
                 if len(shrunk_violated) < len(self.violated_nodes):
                     self.violated_nodes = shrunk_violated
@@ -103,10 +103,34 @@ class MySolver:
                 save_instance("tmp", self.inst, 1)
                 raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
 
+
+            # critical_nodes = [
+            #     v for v in active_nodes
+            #     if len([m for m in self.marked if v == m[0]]) > math.ceil(self.loads[v] / (alpha * self.OPT))
+            # ]
+            #
+            # critical_edges = [
+            #     (a, b) for (a, b) in self.marked
+            #     if a in critical_nodes and b not in self.violated_nodes
+            #        and b not in active_nodes
+            # ]
+            #
+            # lost_marked_flow = sum(
+            #     len([(a, b) for (a, b) in critical_edges if a == x]) * self.loads[x] / len(self.active_edges[x])
+            #     for x in critical_nodes
+            # )
+            #
+            # if lost_marked_flow > self.OPT * sum(len(self.dag.neighbors[x]) for x in self.violated_nodes):
+            #     print(f"Lost Flow too large:  {lost_marked_flow}")
+            #     save_instance("tmp", self.inst, 1)
+            #     exit(1)
+
+
             # Necessary for better distribution
             edge = min(candidate_edges,
-                       key=lambda x: self.loads[x[1]] / len(self.active_edges[x[1]])
-                       if len(self.active_edges[x[1]]) > 0 else self.dag.num_nodes)
+                       key=lambda x: -1 if x[1] == 0 else (
+                           self.loads[x[1]] / len(self.dag.neighbors[x[1]]) if len(self.dag.neighbors[x[1]]) > 0 else self.dag.num_nodes
+                       ))
             start, end = edge
 
             if edge in self.removed:
