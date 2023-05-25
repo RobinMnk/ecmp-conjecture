@@ -5,7 +5,7 @@ from multiprocessing import Process
 from dag_solver import optimal_solution_in_DAG
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
-from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES, error_folder
+from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES, error_folder, _eps
 from my_ecmp import MySolver
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
@@ -52,6 +52,10 @@ class InstanceGenerator:
         return self
 
 
+def sanity_check(opt_solution: Solution, ecmp_solution: ECMP_Sol):
+    return ecmp_solution.congestion + _eps > opt_solution.opt_congestion
+
+
 class ConjectureManager:
     conjectures_to_check = []
     checking_type = CHECK_ON_OPTIMAL_SUB_DAGS_ONLY
@@ -88,10 +92,12 @@ class ConjectureManager:
                f"-Checking Type: {CHECKING_TYPE_NAMES[self.checking_type]}\n" \
                f"-Forwarding Type: {self.forwarding_type}\n"
 
-    def _check_all_conjectures(self, opt_solution: Solution, ecmp_solutions: list[ECMP_Sol], inst: Instance,
-                               index: int):
+    def _check_all_conjectures(self, opt_solution: Solution, ecmp_sols: list[ECMP_Sol], inst: Instance, index: int):
+        if not all(sanity_check(opt_solution, ecmp_sol) for ecmp_sol in ecmp_sols):
+            raise Exception(f"Sanity check failed: ECMP congestion lower than OPT")
+
         return all(
-            conj.check(opt_solution, ecmp_solutions, inst, index)
+            conj.check(opt_solution, ecmp_sols, inst, index)
             for conj in self.conjectures_to_check
         )
 
@@ -362,6 +368,10 @@ def inspect_instance(inst_id: int, folder: str):
 
         sv = MySolver()
         ecmp_sol = sv.solve(opt_sol.dag, inst, opt_sol.opt_congestion)
+
+        if ecmp_sol.congestion < opt_sol.opt_congestion - 0.0000001:
+            raise Exception("Something went wrong here!")
+
         show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
@@ -473,12 +483,12 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    check_test_cases(cm)
+    # check_test_cases(cm)
 
-    ig = InstanceGenerator(100, True)
+    # ig = InstanceGenerator(10, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(2916, "failures")
-    # inspect_instance(1, "tmp")
+    # inspect_instance(4000, "failures")
+    inspect_instance(2, "tmp")
     # run_single_test_suite(ig, cm, 10000)
-    run_multiprocessing_suite(ig, cm, 8, 3000)
+    # run_multiprocessing_suite(ig, cm, 8, 3000)
 
