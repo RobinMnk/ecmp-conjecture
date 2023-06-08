@@ -274,7 +274,8 @@ def run_single_test_suite(generator: InstanceGenerator,
                           cm: ConjectureManager,
                           num_iterations=100,
                           show_results=False,
-                          log_to_stdout=True
+                          log_to_stdout=True,
+                          multiprocessing_results=None
                           ):
     setup_logger(log_to_stdout)
     logger = get_logger()
@@ -290,7 +291,10 @@ def run_single_test_suite(generator: InstanceGenerator,
         logger.info(f"Begin Iteration {i + 1}:")
         inst = next(generator)
 
-        result = cm.verify_instance(inst, i, show_results=show_results)
+        try:
+            result = cm.verify_instance(inst, i, show_results=show_results)
+        except:
+            result = RESULT_ERROR
 
         if result == RESULT_SUCCESS:
             instances_checked += 1
@@ -303,9 +307,13 @@ def run_single_test_suite(generator: InstanceGenerator,
             max_num_nodes = max(max_num_nodes, inst.dag.num_nodes)
 
             cm.write_run_to_log(False, max_num_nodes, run_started, 0)
-            exit(0)
+            multiprocessing_results.put(False)
+            return
+            # exit(0)
         elif result == RESULT_ERROR:
-            exit(1)
+            multiprocessing_results.put(False)
+            return
+            # exit(1)
 
         if i % 500 == 0 and i > 0:
             print(f" - {multiprocessing.current_process().name} at iteration {i} / {num_iterations}\n"
@@ -319,7 +327,11 @@ def run_single_test_suite(generator: InstanceGenerator,
 
     cm.write_run_to_log(True, max_num_nodes, run_started, instances_checked)
 
-    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!")
+    print(f"{multiprocessing.current_process().name} terminated - no counterexample found!\t"
+          f"({instances_checked} feasible instances checked)")
+
+    if multiprocessing_results is not None:
+        multiprocessing_results.put(True)
 
 
 def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=False, log_to_stdout=True):
@@ -343,13 +355,35 @@ def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=Fa
 
 def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManager, num_processes, num_iterations):
     procs = []
+    results = multiprocessing.Queue()
     for i in range(min(num_processes, 8)):
-        proc = Process(target=run_single_test_suite, args=(generator, cm, num_iterations, False, False))
+        proc = Process(target=run_single_test_suite, args=(generator, cm, num_iterations, False, False, results))
         procs.append(proc)
         proc.start()
 
     for proc in procs:
         proc.join()
+
+    success = True
+    count = 0
+    for _ in range(num_processes):
+        item = results.get()
+        if item is None:
+            break
+        success &= item
+        count += 1
+
+    if count < num_processes:
+        success = False
+
+    if success:
+        print("\n" + "=" * 15 + "  !! SUCCESS !!  " + "=" * 15)
+    else:
+        print("=" * 50)
+        print(f"     !!! ERROR or COUNTER EXAMPLE FOUND !!!")
+        print("=" * 50)
+
+    exit(0)
 
 
 def inspect_instance(inst_id: int, folder: str):
@@ -483,12 +517,12 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    # check_test_cases(cm)
+    check_test_cases(cm)
 
-    # ig = InstanceGenerator(10, False)
+    ig = InstanceGenerator(100, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(4000, "failures")
-    inspect_instance(2, "tmp")
-    # run_single_test_suite(ig, cm, 10000)
-    # run_multiprocessing_suite(ig, cm, 8, 3000)
+    # inspect_instance(3928, "failures")
+    # inspect_instance(2, "tmp")
+    run_single_test_suite(ig, cm, 20000)
+    # run_multiprocessing_suite(ig, cm, 8, 10000)
 

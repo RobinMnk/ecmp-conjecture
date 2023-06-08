@@ -9,6 +9,8 @@ from collections import namedtuple, defaultdict
 import random
 import graphviz
 
+PREVENT_INSTANCE_OVERWRITE = False
+
 DAG = namedtuple("DAG", "num_nodes, neighbors, parents")
 Instance = namedtuple("Instance", "dag, sources, target, demands")
 InstanceMTG = namedtuple("Instance", "n, m, edges, parents, top_loads, out_degrees")
@@ -169,5 +171,20 @@ def time_execution(function, *parameters):
 
 def save_instance(path: str, inst: Instance, index: int):
     os.makedirs(f"output/{path}", exist_ok=True)
-    with open(f"output/{path}/ex_{index}.pickle", "wb") as f:
+    file = f"output/{path}/ex_{index}.pickle"
+    if path != "tmp" and PREVENT_INSTANCE_OVERWRITE:
+        idx = index
+        while os.path.exists(file):
+            idx += 1
+            file = f"output/{path}/ex_{idx}.pickle"
+        if idx != index:
+            print(f"WARN: file {path}/ex_{index} already existed. Instead saved as {path}/ex_{idx}")
+    with open(file, "wb") as f:
+        pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
+
+
+def save_instance_temp(inst: Instance):
+    os.makedirs("output/tmp", exist_ok=True)
+    file = f"output/tmp/ex_1.pickle"
+    with open(file, "wb") as f:
         pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)

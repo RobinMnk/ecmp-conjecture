@@ -1,7 +1,9 @@
 import math
 
+import more_itertools
+
 from ecmp import get_ecmp_DAG
-from model import DAG, Instance, show_graph, save_instance, _eps, make_parents
+from model import DAG, Instance, show_graph, save_instance, _eps, make_parents, save_instance_temp
 
 alpha = 2
 
@@ -43,6 +45,64 @@ class MySolver:
             if self.has_path_to_violated(node)
             and node not in self.violated_nodes
         ]
+
+    def check_invariant(self, active_nodes):
+
+        leaving_edges = [
+            (z, n) for z in active_nodes for n in self.active_edges[z]
+            if n not in active_nodes and n not in self.violated_nodes
+        ]
+
+        if len(leaving_edges) > 0 and all(e in self.marked for e in leaving_edges):
+            self.show()
+            print(active_nodes)
+            print(leaving_edges)
+            raise Exception(f"Invariant failed for set: {active_nodes}")
+
+
+
+
+        # for z in active_nodes:
+        #     if len([e for e in self.active_edges[z] if e not in active_nodes and e not in self.violated_nodes]) > 0:
+        #         deg = len(self.active_edges[z])
+        #         pz = math.ceil(self.loads[z] / (alpha * self.OPT))
+        #         mz = deg - pz
+        #
+        #         need = mz <= pz - 2
+        #
+        #         if not need:
+        #             self.show()
+        #             print(z)
+        #             print((pz-1)/(pz+mz))
+        #             raise Exception(f"Invariant failed for set: {active_nodes}")
+
+        # for z in active_nodes:
+        #     for N in [(z, n) for n in zip(more_itertools.powerset(list(self.dag.neighbors[z].keys())))]:
+        #         if len(N[1]) <= len(self.active_edges[z]):
+        #             continue
+        #
+        #         foundOne = False
+        #         for S in more_itertools.powerset(active_nodes):
+        #             if len(S) == 0:
+        #                 continue
+        #
+        #             edge_set = [(a, e) for a in S for e in self.dag.neighbors[a] if (a, e) not in N and e not in S]
+        #             demands = sum(self.inst.demands[v] for v in S)
+        #
+        #             if len(edge_set) * self.OPT < demands:
+        #                 foundOne = True
+        #                 break
+        #
+        #         if not foundOne:
+        #             self.show()
+        #             print(z)
+        #             print(N)
+        #             raise Exception(f"Invariant failed for set: {active_nodes}")
+
+
+
+
+
 
     def update_loads(self, end):
         """ loads can (and should) be maintained automatically, this version is very inefficient """
@@ -86,6 +146,12 @@ class MySolver:
         self.removed = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
+
+            shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
+            if len(shrunk_violated) < len(self.violated_nodes):
+                self.violated_nodes = shrunk_violated
+                continue
+
             active_nodes = self.get_active_nodes()
             candidate_edges = [
                 (node, nb) for node in active_nodes for nb in self.dag.neighbors[node]
@@ -94,6 +160,9 @@ class MySolver:
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
+
+                self.check_invariant(active_nodes)
+
                 # Resetting violated node set
                 shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
                 if len(shrunk_violated) < len(self.violated_nodes):
@@ -101,36 +170,10 @@ class MySolver:
                     continue
 
                 save_instance("tmp", self.inst, 1)
-                raise Exception(f"Endless Loop during fixup for nodes {self.violated_nodes}")
+                raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
 
 
-            # critical_nodes = [
-            #     v for v in active_nodes
-            #     if len([m for m in self.marked if v == m[0]]) > math.ceil(self.loads[v] / (alpha * self.OPT))
-            # ]
-            #
-            # critical_edges = [
-            #     (a, b) for (a, b) in self.marked
-            #     if a in critical_nodes and b not in self.violated_nodes
-            #        and b not in active_nodes
-            # ]
-            #
-            # lost_marked_flow = sum(
-            #     len([(a, b) for (a, b) in critical_edges if a == x]) * self.loads[x] / len(self.active_edges[x])
-            #     for x in critical_nodes
-            # )
-            #
-            # if lost_marked_flow > self.OPT * sum(len(self.dag.neighbors[x]) for x in self.violated_nodes):
-            #     print(f"Lost Flow too large:  {lost_marked_flow}")
-            #     save_instance("tmp", self.inst, 1)
-            #     exit(1)
-
-
-            # Necessary for better distribution
-            edge = min(candidate_edges,
-                       key=lambda x: -1 if x[1] == 0 else (
-                           self.loads[x[1]] / len(self.dag.neighbors[x[1]]) if len(self.dag.neighbors[x[1]]) > 0 else self.dag.num_nodes
-                       ))
+            edge = min(candidate_edges, key=lambda x: x[1])
             start, end = edge
 
             if edge in self.removed:
