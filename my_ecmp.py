@@ -5,8 +5,6 @@ import more_itertools
 from ecmp import get_ecmp_DAG
 from model import DAG, Instance, show_graph, save_instance, _eps, make_parents, save_instance_temp
 
-alpha = 2
-
 
 def path_to(a, b, active_edges):
     if b in active_edges[a]:
@@ -28,9 +26,10 @@ class MySolver:
     violated_nodes = list()
     marked = list()
     removed = list()
+    alpha = 1
 
     def is_node_violated(self, node):
-        return node > 0 and self.loads[node] > alpha * self.OPT * len(self.dag.neighbors[node])
+        return node > 0 and self.loads[node] > self.alpha * self.OPT * len(self.dag.neighbors[node])
 
     def has_path_to_violated(self, a, active_edges_only=True):
         if a in self.violated_nodes:  # or any(v in self.active_edges[a] for v in self.violated_nodes):
@@ -101,9 +100,6 @@ class MySolver:
 
 
 
-
-
-
     def update_loads(self, end):
         """ loads can (and should) be maintained automatically, this version is very inefficient """
         dag = DAG(self.dag.num_nodes, self.active_edges, [])
@@ -113,7 +109,7 @@ class MySolver:
             if node in self.violated_nodes:
                 continue
 
-            num_packets = math.ceil(self.loads[node] / (alpha * self.OPT))
+            num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
             old_degree = len(self.active_edges[node])
 
             if num_packets > old_degree:
@@ -168,8 +164,33 @@ class MySolver:
                     self.violated_nodes = shrunk_violated
                     continue
 
-                save_instance("tmp", self.inst, 1)
-                raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+
+                # Need to increase alpha!
+                num_low_edges = len([
+                    (z, n) for z in active_nodes for n in self.active_edges[z]
+                    if n not in active_nodes and n not in self.violated_nodes
+                    if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
+                ])
+                degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
+                degrees_A = sum(len(self.dag.neighbors[a]) for a in active_nodes)
+
+                new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
+
+                if new_alpha < self.alpha:
+                    save_instance("tmp", self.inst, 1)
+                    raise Exception("Alpha should only increase!")
+
+
+                # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
+
+                if new_alpha == self.alpha:
+                    self.show()
+                    save_instance("tmp", self.inst, 1)
+                    raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+
+                self.alpha = new_alpha
+                self.update_loads(current)
+                continue
 
             edge = min(candidate_edges,
                    key=lambda x: -1 if x[1] == 0 else (
@@ -199,13 +220,13 @@ class MySolver:
         if node == 0 or self.loads[node] == 0:
             return
 
-        num_packets = math.ceil(self.loads[node] / (alpha * self.OPT))
+        num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
         degree = len(self.dag.neighbors[node])
 
         if num_packets > degree:
             # Call Fixup Routine!
             self.fixup(node)
-            num_packets = math.ceil(self.loads[node] / (alpha * self.OPT))
+            num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
 
         # activate highest num_packets out-edges in top. order
         for neighbor in list(reversed(self.dag.neighbors[node]))[:num_packets]:
@@ -225,6 +246,12 @@ class MySolver:
 
         for node in reversed(list(range(1, dag.num_nodes))):
             self.process_node(node)
+
+        # print(f"Succeeded with alpha = {self.alpha:0.3f}")
+
+        if self.alpha >= 2:
+            save_instance("tmp", self.inst, 1)
+            raise Exception("Assumption failed, alpha >= 2")
 
         dag = DAG(dag.num_nodes, self.active_edges, make_parents(self.active_edges))
         return get_ecmp_DAG(dag, inst)

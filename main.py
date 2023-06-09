@@ -517,12 +517,12 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    check_test_cases(cm)
+    # check_test_cases(cm)
 
-    # ig = InstanceGenerator(100, False)
+    ig = InstanceGenerator(200, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    inspect_instance(1686, "failures")
-    # inspect_instance(2, "tmp")
+    # inspect_instance(1686, "failures")
+    inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 20000)
-    # run_multiprocessing_suite(ig, cm, 8, 10000)
+    # run_multiprocessing_suite(ig, cm, 8, 20000)
 
