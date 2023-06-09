@@ -3,6 +3,8 @@ from model import *
 import pickle
 import os
 
+_eps = 0.00000001
+
 
 class Conjecture:
     VERBOSE = True
@@ -51,9 +53,18 @@ class Conjecture:
 MAIN_CONJECTURE = Conjecture(
     "congestion",
     lambda opt_sol, ecmp_sols, _: all(
-        ecmp_sols[i].congestion < 2 * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
+        ecmp_sols[i].congestion <= 2 * (opt_sol.opt_congestion + _eps) for i in range(len(ecmp_sols))),
     lambda opt_sol, ecmp_sols, _:
     f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\n"
+)
+
+
+DEGREE_RATIO_LEMMA = Conjecture(
+    "degree_ratio",
+    lambda opt_sol, ecmp_sols, inst: all(
+        ecmp_sols[i].congestion <= (1 + calculate_max_degree_ratio(opt_sol.dag)) * opt_sol.opt_congestion for i in range(len(ecmp_sols))),
+    lambda opt_sol, ecmp_sols, inst:
+    f"Optimal Congestion: {opt_sol.opt_congestion}\nBest ECMP Congestion: {min(ecmp.congestion for ecmp in ecmp_sols)}\nMax Degree Ratio: {calculate_max_degree_ratio(inst)}"
 )
 
 
@@ -129,3 +140,16 @@ EDGE_LOAD_CONJECTURE = Conjecture(
                                      )
 
 )
+
+CONJECTURES_LIST = [
+    MAIN_CONJECTURE, DEGREE_RATIO_LEMMA, LOADS_CONJECTURE, EDGE_LOAD_CONJECTURE
+]
+
+ALL_CONJECTURES = {
+    c.name: c for c in CONJECTURES_LIST
+}
+
+
+def error_folder(conj: Conjecture):
+    return f"errors_{conj.name}"
+
