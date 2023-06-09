@@ -160,8 +160,7 @@ class MySolver:
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
-
-                self.check_invariant(active_nodes)
+                # self.check_invariant(active_nodes)
 
                 # Resetting violated node set
                 shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
@@ -172,8 +171,10 @@ class MySolver:
                 save_instance("tmp", self.inst, 1)
                 raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
 
-
-            edge = min(candidate_edges, key=lambda x: x[1])
+            edge = min(candidate_edges,
+                   key=lambda x: -1 if x[1] == 0 else (
+                       self.loads[x[1]] / len(self.dag.neighbors[x[1]]) if len(self.dag.neighbors[x[1]]) > 0 else self.dag.num_nodes
+                   ))
             start, end = edge
 
             if edge in self.removed:
