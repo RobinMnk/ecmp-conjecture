@@ -145,7 +145,6 @@ class ConjectureManager:
                 f"Calculated ECMP solution with my Algorithm\t{f'  ({ecmp_time:0.2f}s)' if ecmp_time > 1 else ''}")
 
             if not ecmp_solution:
-                # show_graph(inst, f"ex_{index}", opt_solution.dag)
                 save_instance("failures", inst, index)
                 logger.error("There was an error. The ECMP solution could not be calculated. "
                              f"Check the failures/ex_{index} files. Exiting.")
@@ -154,6 +153,11 @@ class ConjectureManager:
             verification_time, solution = time_execution(
                 self._check_all_conjectures, opt_solution, [ecmp_solution], inst, index
             )
+
+            performance_ratio = ecmp_solution.congestion / opt_solution.opt_congestion
+
+            if performance_ratio > solver.alpha + _eps:
+                raise Exception("Alpha not equal to performance ratio")
 
             if solution:
                 logger.info(f"Verified all conjectures for ECMP with my Algorithm"
@@ -409,6 +413,12 @@ def inspect_instance(inst_id: int, folder: str):
         show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
+
+        performance_ratio = ecmp_sol.congestion / opt_sol.opt_congestion
+
+        if performance_ratio > sv.alpha + _eps:
+            raise Exception("Alpha not equal to performance ratio")
+
         if ecmp_sol.congestion > 2 * opt_sol.opt_congestion:
             raise Exception("Conjecture violated!")
 
@@ -517,12 +527,13 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
     cm.register(MAIN_CONJECTURE)
 
-    # check_test_cases(cm)
+    check_test_cases(cm)
 
-    ig = InstanceGenerator(200, False)
+    ig = InstanceGenerator(150, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(1686, "failures")
-    inspect_instance(1, "tmp")
-    # run_single_test_suite(ig, cm, 20000)
+    # inspect_instance(51, "failures")
+    # inspect_instance(7777, "tricky")
+    # inspect_instance(1, "tmp")
+    run_single_test_suite(ig, cm, 1000)
     # run_multiprocessing_suite(ig, cm, 8, 20000)
 

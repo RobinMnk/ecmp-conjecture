@@ -1,9 +1,7 @@
 import math
 
-import more_itertools
-
 from ecmp import get_ecmp_DAG
-from model import DAG, Instance, show_graph, save_instance, _eps, make_parents, save_instance_temp
+from model import DAG, Instance, show_graph, save_instance, _eps, make_parents, save_instance_temp, ECMP_Sol
 
 
 def path_to(a, b, active_edges):
@@ -99,6 +97,21 @@ class MySolver:
         #             raise Exception(f"Invariant failed for set: {active_nodes}")
 
 
+    def prune(self, cutoff, active_nodes):
+        changes_made = False
+        for z in active_nodes:
+            f = self.loads[z] / len(self.active_edges[z])
+            for nb in self.active_edges[z]:
+                if nb == 0:
+                    continue
+                desc = [z for z in range(cutoff, self.dag.num_nodes)
+                        if self.has_path_to_node_set(nb, [z], active_edges_only=True)]
+                if len(desc) > 0 and all(self.loads[w] <= self.alpha * self.OPT * len(self.dag.neighbors[w]) - f for w in desc):
+                    self.active_edges[z].remove(nb)
+                    if (z, nb) in self.marked:
+                        self.marked.remove((z, nb))
+                    changes_made = True
+        return changes_made
 
     def update_loads(self, end):
         """ loads can (and should) be maintained automatically, this version is very inefficient """
@@ -164,7 +177,6 @@ class MySolver:
                     self.violated_nodes = shrunk_violated
                     continue
 
-
                 # Need to increase alpha!
                 num_low_edges = len([
                     (z, n) for z in active_nodes for n in self.active_edges[z]
@@ -184,11 +196,14 @@ class MySolver:
                 # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
                 if new_alpha == self.alpha:
-                    self.show()
-                    save_instance("tmp", self.inst, 1)
-                    raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+                    # self.prune(current, active_nodes)
+                    # self.show()
+                    # save_instance("tmp", self.inst, 1)
+                    # raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+                    self.marked = []
 
                 self.alpha = new_alpha
+                self.marked = []
                 self.update_loads(current)
                 continue
 
@@ -235,7 +250,7 @@ class MySolver:
                 self.active_edges[node].append(neighbor)
                 self.loads[neighbor] += self.loads[node] / num_packets
 
-    def solve(self, dag: DAG, inst: Instance, OPT):
+    def solve(self, dag: DAG, inst: Instance, OPT) -> ECMP_Sol:
         self.dag = dag
         self.inst = inst
         self.OPT = OPT + _eps

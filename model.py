@@ -172,7 +172,7 @@ def time_execution(function, *parameters):
 def save_instance(path: str, inst: Instance, index: int):
     os.makedirs(f"output/{path}", exist_ok=True)
     file = f"output/{path}/ex_{index}.pickle"
-    if path != "tmp" and PREVENT_INSTANCE_OVERWRITE:
+    if path != "tmp" and (PREVENT_INSTANCE_OVERWRITE or path == "failures"):
         idx = index
         while os.path.exists(file):
             idx += 1
