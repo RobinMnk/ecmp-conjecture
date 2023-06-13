@@ -2,6 +2,7 @@ import traceback
 from datetime import datetime
 from multiprocessing import Process
 
+import model
 from dag_solver import optimal_solution_in_DAG
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
@@ -315,7 +316,8 @@ def run_single_test_suite(generator: InstanceGenerator,
             return
             # exit(0)
         elif result == RESULT_ERROR:
-            multiprocessing_results.put(False)
+            if multiprocessing_results is not None:
+                multiprocessing_results.put(False)
             return
             # exit(1)
 
@@ -469,7 +471,7 @@ def new_test():
     inst = build_random_DAG(50, 0.6, False)
 
     # save_instance("new", inst, 2)
-    # with open(f"output/new/ex_2.pickle", "rb") as f:
+    # with open(f"output/new/ex_1002.pickle", "rb") as f:
     #     inst = pickle.load(f)
 
     show_graph(inst, "_new_dag")
@@ -487,6 +489,7 @@ def new_test():
 
 
 def check_test_cases(cm):
+    model.TESTCASE_RUNNING = True
     directory = "output/failures"
     inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
     for inst_id in sorted(inst_ids):
@@ -506,6 +509,8 @@ def check_test_cases(cm):
     logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
     logger.info("=" * 40)
 
+    model.TESTCASE_RUNNING = False
+
 def custom_instance2():
     neighbors = [
         [], [0], [0], [1, 2], [3], [0], [0], [0], [5, 6, 7], [8], [8], [8], [8], [3]
@@ -524,16 +529,16 @@ def custom_instance2():
 
 
 if __name__ == '__main__':
-    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=True)
+    cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
     check_test_cases(cm)
 
-    ig = InstanceGenerator(150, False)
+    ig = InstanceGenerator(100, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(51, "failures")
+    # inspect_instance(536, "failures")
     # inspect_instance(7777, "tricky")
     # inspect_instance(1, "tmp")
-    run_single_test_suite(ig, cm, 1000)
-    # run_multiprocessing_suite(ig, cm, 8, 20000)
+    # run_single_test_suite(ig, cm, 1000)
+    # run_multiprocessing_suite(ig, cm, 8, 5000)
 

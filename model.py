@@ -10,6 +10,7 @@ import random
 import graphviz
 
 PREVENT_INSTANCE_OVERWRITE = False
+TESTCASE_RUNNING = False
 
 DAG = namedtuple("DAG", "num_nodes, neighbors, parents")
 Instance = namedtuple("Instance", "dag, sources, target, demands")
@@ -172,7 +173,7 @@ def time_execution(function, *parameters):
 def save_instance(path: str, inst: Instance, index: int):
     os.makedirs(f"output/{path}", exist_ok=True)
     file = f"output/{path}/ex_{index}.pickle"
-    if path != "tmp" and (PREVENT_INSTANCE_OVERWRITE or path == "failures"):
+    if path != "tmp" and (PREVENT_INSTANCE_OVERWRITE or (path == "failures" and not TESTCASE_RUNNING)):
         idx = index
         while os.path.exists(file):
             idx += 1

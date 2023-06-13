@@ -5,14 +5,14 @@ from model import DAG, Instance, show_graph, save_instance, _eps, make_parents, 
 
 
 def path_to(a, b, active_edges):
-    if b in active_edges[a]:
+    if a == b or b in active_edges[a]:
         return [a]
     else:
         for nb in active_edges[a]:
             p = path_to(nb, b, active_edges)
             if p:
                 return [b] + p
-        return []
+        return None
 
 
 class MySolver:
@@ -40,7 +40,7 @@ class MySolver:
         return [
             node for node in range(1, self.dag.num_nodes)
             if self.has_path_to_violated(node)
-            and node not in self.violated_nodes
+               and node not in self.violated_nodes
         ]
 
     def check_invariant(self, active_nodes):
@@ -55,9 +55,6 @@ class MySolver:
             print(active_nodes)
             print(leaving_edges)
             raise Exception(f"Invariant failed for set: {active_nodes}")
-
-
-
 
         # for z in active_nodes:
         #     if len([e for e in self.active_edges[z] if e not in active_nodes and e not in self.violated_nodes]) > 0:
@@ -96,22 +93,21 @@ class MySolver:
         #             print(N)
         #             raise Exception(f"Invariant failed for set: {active_nodes}")
 
-
-    def prune(self, cutoff, active_nodes):
-        changes_made = False
-        for z in active_nodes:
-            f = self.loads[z] / len(self.active_edges[z])
-            for nb in self.active_edges[z]:
-                if nb == 0:
-                    continue
-                desc = [z for z in range(cutoff, self.dag.num_nodes)
-                        if self.has_path_to_node_set(nb, [z], active_edges_only=True)]
-                if len(desc) > 0 and all(self.loads[w] <= self.alpha * self.OPT * len(self.dag.neighbors[w]) - f for w in desc):
-                    self.active_edges[z].remove(nb)
-                    if (z, nb) in self.marked:
-                        self.marked.remove((z, nb))
-                    changes_made = True
-        return changes_made
+    # def prune(self, cutoff, active_nodes):
+    #     changes_made = False
+    #     for z in active_nodes:
+    #         f = self.loads[z] / len(self.active_edges[z])
+    #         for nb in self.active_edges[z]:
+    #             if nb == 0:
+    #                 continue
+    #             desc = [z for z in range(cutoff, self.dag.num_nodes)
+    #                     if self.has_path_to_node_set(nb, [z], active_edges_only=True)]
+    #             if len(desc) > 0 and all(self.loads[w] <= self.alpha * self.OPT * len(self.dag.neighbors[w]) - f for w in desc):
+    #                 self.active_edges[z].remove(nb)
+    #                 if (z, nb) in self.marked:
+    #                     self.marked.remove((z, nb))
+    #                 changes_made = True
+    #     return changes_made
 
     def update_loads(self, end):
         """ loads can (and should) be maintained automatically, this version is very inefficient """
@@ -150,6 +146,71 @@ class MySolver:
         sol = get_ecmp_DAG(dag, self.inst)
         show_graph(trimmed_inst, "_ecmp", sol.dag)
 
+
+    def check_invariant2(self, current, active_nodes):
+        k = len([
+            (z, n) for z in active_nodes for n in self.active_edges[z]
+            if n not in active_nodes and n not in self.violated_nodes
+            if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
+        ])
+
+        degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
+        val = degrees_X
+
+        for z in active_nodes:
+            if len(self.active_edges[z]) == 1:
+                continue
+            f = self.loads[z] / len(self.active_edges[z])
+            if f >= self.alpha * self.OPT / 2:
+                continue
+
+            pz = math.ceil(self.loads[z] / (self.alpha * self.OPT))
+            mz = len(self.active_edges[z]) - pz
+
+            val += (pz - 1) / (pz + mz)
+
+        if not val >= k / 2:
+            self.show()
+            print("Invariant failed!")
+            # raise Exception("Invariant failed!")
+
+
+            # for nb in self.active_edges[z]:
+            #     if nb == 0:
+            #         continue
+            #
+            #     candidate_nodes = [
+            #         w for w in range(1, self.dag.num_nodes)
+            #         if path_to(nb, w, self.active_edges) is not None
+            #         and self.loads[w] > self.alpha * self.OPT * (len(self.dag.neighbors[w]) - 0.5)
+            #     ]
+            #
+            #     if len(candidate_nodes) < len(self.active_edges[z]) / 2 - 1:
+            #         self.show()
+            #         edge = (z, nb)
+            #         print("Invariant failed!")
+            #         # raise Exception("Invariant failed!")
+
+                # if len(candidate_nodes) == 0:
+                    # # Check can remove edge (z, nb)
+                    # es = [[e for e in self.active_edges[z]] for z in range(self.dag.num_nodes)]
+                    # es[z].remove(nb)
+                    # dag = DAG(self.dag.num_nodes, es, [])
+                    # sol = get_ecmp_DAG(dag, self.inst)
+                    # cong = max(sol.loads[x] / len(es[x]) for x in range(current, dag.num_nodes) if len(es[x]) > 0)
+                    #
+                    # mycong = max(self.loads[x] / len(self.active_edges[x]) for x in range(current, dag.num_nodes) if len(self.active_edges[x]) > 0)
+                    #
+                    # #
+                    # if cong > mycong:
+                    #     self.show()
+                    #     edge = (z, nb)
+                    #     print("Invariant failed!")
+                        # raise Exception("Invariant failed!")
+
+
+
+
     def fixup(self, current):
         self.violated_nodes = [current]
         self.removed = list()
@@ -178,39 +239,49 @@ class MySolver:
                     continue
 
                 # Need to increase alpha!
-                num_low_edges = len([
+                low_edges = [
                     (z, n) for z in active_nodes for n in self.active_edges[z]
                     if n not in active_nodes and n not in self.violated_nodes
                     if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
-                ])
+                ]
+                num_low_edges = len(low_edges)
+                Phi = sum(self.loads[z] / len(self.active_edges[z]) for z, _ in low_edges)
                 degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
                 degrees_A = sum(len(self.dag.neighbors[a]) for a in active_nodes)
 
-                new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
+                demands_A = sum(self.inst.demands[z] for z in active_nodes)
+                demands_X = sum(self.inst.demands[z] for z in self.violated_nodes)
+
+                # new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
+                # new_alpha = 2 / (1 + (self.OPT * degrees_X) / (demands_X + demands_A))
+                new_alpha = 2*((demands_A+demands_X-Phi)/self.OPT)/((demands_A+demands_X)/self.OPT + degrees_X - num_low_edges)
 
                 if new_alpha < self.alpha:
                     save_instance("tmp", self.inst, 1)
-                    raise Exception("Alpha should only increase!")
+                    self.show()
+                    raise Exception(f"Alpha should only increase! {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
-
-                # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
+                print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
                 if new_alpha == self.alpha:
                     # self.prune(current, active_nodes)
-                    # self.show()
-                    # save_instance("tmp", self.inst, 1)
-                    # raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
-                    self.marked = []
+                    self.show()
+                    save_instance("tmp", self.inst, 1)
+                    raise Exception(f"Infinite Loop during fixup for nodes {self.violated_nodes}")
+                    # self.marked = []
 
                 self.alpha = new_alpha
                 self.marked = []
                 self.update_loads(current)
                 continue
 
+
             edge = min(candidate_edges,
-                   key=lambda x: -1 if x[1] == 0 else (
-                       self.loads[x[1]] / len(self.dag.neighbors[x[1]]) if len(self.dag.neighbors[x[1]]) > 0 else self.dag.num_nodes
-                   ))
+                       key=lambda x: -1 if x[1] == 0 else (
+                           self.loads[x[1]] / len(self.dag.neighbors[x[1]])
+                           if len(self.dag.neighbors[x[1]]) > 0
+                           else self.dag.num_nodes
+                       ))
             start, end = edge
 
             if edge in self.removed:
