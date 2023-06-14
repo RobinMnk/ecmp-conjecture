@@ -534,11 +534,11 @@ if __name__ == '__main__':
 
     # check_test_cases(cm)
 
-    ig = InstanceGenerator(10, False)
+    ig = InstanceGenerator(150, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
     # inspect_instance(24, "failures")
     # inspect_instance(7777, "tricky")
-    inspect_instance(1, "tmp")
-    run_single_test_suite(ig, cm, 5)
-    # run_multiprocessing_suite(ig, cm, 8, 5000)
+    # inspect_instance(1, "tmp")
+    # run_single_test_suite(ig, cm, 5)
+    run_multiprocessing_suite(ig, cm, 8, 5000)
 
