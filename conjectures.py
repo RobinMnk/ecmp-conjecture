@@ -33,7 +33,7 @@ class Conjecture:
         os.makedirs(f"output/errors_{self.name}", exist_ok=True)
         with open(f"output/errors_{self.name}/ex_{index}.pickle", "wb") as f:
             pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
-            show_graph(inst, f"errors_{self.name}/ex_{index}", opt_solution.dag)
+            # show_graph(inst, f"errors_{self.name}/ex_{index}", opt_solution.dag)
 
         with open(f"output/errors_{self.name}/ex_{index}_fail.txt", "w") as f:
             f.write(self.failure_message(opt_solution, ecmp_solutions, inst))

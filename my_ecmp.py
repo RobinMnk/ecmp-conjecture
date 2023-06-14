@@ -15,6 +15,14 @@ def path_to(a, b, active_edges):
         return None
 
 
+def hash_edge_set(edge_set):
+    hash = 0
+    for z, lst in enumerate(edge_set):
+        for nb in lst:
+            hash += ((432 * z + 5324) * (523467 * nb + 96234) + 543) % 67939
+    return (sum(len(edge_set[z]) for z in range(len(edge_set))) * 80347 * hash + 241) % 79194553883
+
+
 class MySolver:
     dag = None
     inst = None
@@ -24,7 +32,7 @@ class MySolver:
     violated_nodes = list()
     marked = list()
     removed = list()
-    alpha = 1
+    alpha = 2
 
     def show(self):
         trimmed_inst = Instance(self.dag, self.inst.sources, self.inst.target, self.loads)
@@ -79,12 +87,14 @@ class MySolver:
                     self.removed.append((node, smallest_neighbor))
                     self.update_loads(end)
                     return
-        self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
+        # self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
 
     def fixup(self, current):
         self.violated_nodes = [current]
         self.removed = list()
-        # self.marked = list()
+        self.marked = list()
+
+        sequence = list()
 
         while any(self.is_node_violated(v) for v in self.violated_nodes):
             active_nodes = self.get_active_nodes()
@@ -95,22 +105,29 @@ class MySolver:
             ]  # all inactive edges leaving an active node
 
             if not candidate_edges:
+                shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
+                if len(shrunk_violated) < len(self.violated_nodes):
+                    self.violated_nodes = shrunk_violated
+                    continue
+
                 # Need to increase alpha!
                 num_low_edges = len([
                     (z, n) for z in active_nodes for n in self.active_edges[z]
                     if n not in active_nodes and n not in self.violated_nodes
                     if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
                 ])
-                degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
+                degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes if self.is_node_violated(a))
                 degrees_A = sum(len(self.dag.neighbors[a]) for a in active_nodes)
 
                 new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
 
+                print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
+
                 if new_alpha < self.alpha:
+                    self.show()
                     save_instance_temp(self.inst)
                     raise Exception("Alpha should only increase!")
 
-                # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
                 if new_alpha == self.alpha:
                     self.show()
@@ -133,18 +150,46 @@ class MySolver:
                        ))
             start, end = edge
 
-            if edge in self.removed:
+            entry = (edge, hash_edge_set(self.active_edges))
+
+            cycle_removed = False
+            for ix, comp in enumerate(reversed(sequence)):
+                if comp == entry:
+                    index = len(sequence) - ix - 1
+                    cycle = list(map(lambda x: x[0], sequence[index:]))
+                    print(f"Cycle of length {len(cycle)} detected:  {cycle}")
+                    nbs = [nb for s, nb in cycle if s == start]
+                    for nb in nbs:
+                        self.marked.append((start, nb))
+                        if nb not in self.active_edges[start]:
+                            self.active_edges[start].append(nb)
+                    self.update_loads(current)
+                    sequence = []
+                    cycle_removed = True
+                    break
+
+            if cycle_removed:
+                continue
+
+            sequence.append(entry)
+
+            # if edge in self.removed:
+            #     self.marked.append(edge)
+            # else:
+            relief_edges = [
+                x for x in self.active_edges[start]
+                if (start, x) not in candidate_edges
+                and self.has_path_to_violated(x, active_edges_only=False)
+            ]
+
+            neighbor_to_delete = relief_edges[0]
+
+            if (start, neighbor_to_delete) in self.marked:
                 self.marked.append(edge)
             else:
-                relief_edges = [
-                    x for x in self.active_edges[start]
-                    if (start, x) not in candidate_edges
-                    and self.has_path_to_violated(x, active_edges_only=False)
-                ]
-
-                neighbor_to_delete = relief_edges[0]
                 self.active_edges[start].remove(neighbor_to_delete)
                 self.removed.append((start, neighbor_to_delete))
+
 
             self.active_edges[start].append(end)
             self.update_loads(current)
