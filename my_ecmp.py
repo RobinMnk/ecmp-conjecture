@@ -24,7 +24,7 @@ class MySolver:
     violated_nodes = list()
     marked = list()
     removed = list()
-    alpha = 1
+    alpha = 2
 
     def is_node_violated(self, node):
         return node > 0 and self.loads[node] > self.alpha * self.OPT * len(self.dag.neighbors[node])
@@ -148,67 +148,105 @@ class MySolver:
 
 
     def check_invariant2(self, current, active_nodes):
-        k = len([
-            (z, n) for z in active_nodes for n in self.active_edges[z]
-            if n not in active_nodes and n not in self.violated_nodes
-            if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
-        ])
-
-        degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
-        val = degrees_X
-
+        # k = len([
+        #     (z, n) for z in active_nodes for n in self.active_edges[z]
+        #     if n not in active_nodes and n not in self.violated_nodes
+        #     if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
+        # ])
+        #
+        # degrees_X = sum(len(self.dag.neighbors[a]) for a in self.violated_nodes)
+        # val = degrees_X
+        #
         for z in active_nodes:
             if len(self.active_edges[z]) == 1:
                 continue
             f = self.loads[z] / len(self.active_edges[z])
             if f >= self.alpha * self.OPT / 2:
                 continue
-
+        #
             pz = math.ceil(self.loads[z] / (self.alpha * self.OPT))
             mz = len(self.active_edges[z]) - pz
 
-            val += (pz - 1) / (pz + mz)
+            if mz > 1:
+                self.show()
+                print("Invariant failed! mz > 1")
+                save_instance_temp(self.inst)
+                raise Exception("Assumption failed")
 
-        if not val >= k / 2:
-            self.show()
-            print("Invariant failed!")
-            # raise Exception("Invariant failed!")
+            # if mz == 1:
+            #     if pz < 3:
+            #         print("Assumption failed!, pz too small")
+            #         save_instance_temp(self.inst)
+            #         raise Exception("Assumption failed")
 
+            # continue
+        #     val += (pz - 1) / (pz + mz)
+        #
+        # if not val >= k / 2:
+        #     self.show()
+        #     print("Invariant failed!")
+        #     # raise Exception("Invariant failed!")
 
-            # for nb in self.active_edges[z]:
-            #     if nb == 0:
-            #         continue
-            #
-            #     candidate_nodes = [
-            #         w for w in range(1, self.dag.num_nodes)
-            #         if path_to(nb, w, self.active_edges) is not None
-            #         and self.loads[w] > self.alpha * self.OPT * (len(self.dag.neighbors[w]) - 0.5)
-            #     ]
-            #
-            #     if len(candidate_nodes) < len(self.active_edges[z]) / 2 - 1:
-            #         self.show()
-            #         edge = (z, nb)
-            #         print("Invariant failed!")
-            #         # raise Exception("Invariant failed!")
+            for nb in self.active_edges[z]:
+                if nb == 0:
+                    continue
 
-                # if len(candidate_nodes) == 0:
+                candidate_nodes = [
+                    w for w in range(1, self.dag.num_nodes)
+                    if path_to(nb, w, self.active_edges) is not None
+                    and self.loads[w] > self.alpha * self.OPT * (len(self.dag.neighbors[w]) - 0.5)
+                ]
+
+                # if len(candidate_nodes) < len(self.active_edges[z]) / 2 - 1:
+                #     self.show()
+                #     edge = (z, nb)
+                #     print("Invariant failed!")
+                    # raise Exception("Invariant failed!")
+
+                if len(candidate_nodes) == 0:
+                    # self.show()
+                    # save_instance_temp(self.inst)
+                    # raise Exception("Invariant failed!")
+
+                    # before = max(self.loads[x] / len(self.active_edges[x]) for x in range(current, self.dag.num_nodes) if len(self.active_edges[x]) > 0 and x not in self.violated_nodes)
+
+                    for e in self.marked:
+                        u, _ = e
+                        if z == u:
+                            self.marked.remove(e)
+                    self.update_loads(current)
+
+                    active_nodes = self.get_active_nodes()
+                    if z not in active_nodes:
+                        continue
+
+                    if nb not in self.active_edges[z]:
+                        continue
+
+                    candidate_nodes = [
+                        w for w in range(1, self.dag.num_nodes)
+                        if path_to(nb, w, self.active_edges) is not None
+                           and self.loads[w] > self.alpha * self.OPT * (len(self.dag.neighbors[w]) - 0.5)
+                    ]
+
+                    # after = max(self.loads[x] / len(self.active_edges[x]) for x in range(current, self.dag.num_nodes) if len(self.active_edges[x]) > 0 and x not in self.violated_nodes)
+
                     # # Check can remove edge (z, nb)
                     # es = [[e for e in self.active_edges[z]] for z in range(self.dag.num_nodes)]
                     # es[z].remove(nb)
                     # dag = DAG(self.dag.num_nodes, es, [])
                     # sol = get_ecmp_DAG(dag, self.inst)
-                    # cong = max(sol.loads[x] / len(es[x]) for x in range(current, dag.num_nodes) if len(es[x]) > 0)
+                    # cong = max(sol.loads[x] / len(es[x]) for x in range(current, dag.num_nodes) if len(es[x]) > 0 and x not in self.violated_nodes)
                     #
-                    # mycong = max(self.loads[x] / len(self.active_edges[x]) for x in range(current, dag.num_nodes) if len(self.active_edges[x]) > 0)
-                    #
-                    # #
-                    # if cong > mycong:
-                    #     self.show()
-                    #     edge = (z, nb)
-                    #     print("Invariant failed!")
-                        # raise Exception("Invariant failed!")
+                    # mycong = max(self.loads[x] / len(self.active_edges[x]) for x in range(current, dag.num_nodes) if len(self.active_edges[x]) > 0 and x not in self.violated_nodes)
 
-
+                    # if after > before:
+                    if len(candidate_nodes) == 0:
+                        self.show()
+                        print("Invariant failed! no violated node in desc")
+                        save_instance_temp(self.inst)
+                        raise Exception("Invariant failed!")
+        return True
 
 
     def fixup(self, current):
@@ -228,6 +266,16 @@ class MySolver:
                 if nb not in self.active_edges[node]
                 and nb not in self.violated_nodes
             ]  # all inactive edges leaving an active node
+
+            # if not self.check_invariant2(current, active_nodes):
+            #     active_nodes = self.get_active_nodes()
+            #     candidate_edges = [
+            #         (node, nb) for node in active_nodes for nb in self.dag.neighbors[node]
+            #         if nb not in self.active_edges[node]
+            #            and nb not in self.violated_nodes
+            #     ]
+
+            # self.check_invariant2(current, active_nodes)
 
             if not candidate_edges:
                 # self.check_invariant(active_nodes)
@@ -252,16 +300,16 @@ class MySolver:
                 demands_A = sum(self.inst.demands[z] for z in active_nodes)
                 demands_X = sum(self.inst.demands[z] for z in self.violated_nodes)
 
-                # new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
+                new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
                 # new_alpha = 2 / (1 + (self.OPT * degrees_X) / (demands_X + demands_A))
-                new_alpha = 2*((demands_A+demands_X-Phi)/self.OPT)/((demands_A+demands_X)/self.OPT + degrees_X - num_low_edges)
+                # new_alpha = 2*((demands_A+demands_X-Phi)/self.OPT)/((demands_A+demands_X)/self.OPT + degrees_X - num_low_edges)
 
                 if new_alpha < self.alpha:
                     save_instance("tmp", self.inst, 1)
                     self.show()
                     raise Exception(f"Alpha should only increase! {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
-                print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
+                # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
                 if new_alpha == self.alpha:
                     # self.prune(current, active_nodes)
@@ -274,7 +322,6 @@ class MySolver:
                 self.marked = []
                 self.update_loads(current)
                 continue
-
 
             edge = min(candidate_edges,
                        key=lambda x: -1 if x[1] == 0 else (
@@ -335,9 +382,9 @@ class MySolver:
 
         # print(f"Succeeded with alpha = {self.alpha:0.3f}")
 
-        if self.alpha >= 2:
-            save_instance("tmp", self.inst, 1)
-            raise Exception("Assumption failed, alpha >= 2")
+        # if self.alpha >= 2:
+        #     save_instance("tmp", self.inst, 1)
+        #     raise Exception("Assumption failed, alpha >= 2")
 
         dag = DAG(dag.num_nodes, self.active_edges, make_parents(self.active_edges))
         return get_ecmp_DAG(dag, inst)
