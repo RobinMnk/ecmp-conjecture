@@ -415,8 +415,9 @@ def inspect_instance(inst_id: int, folder: str):
         show_graph(trimmed_inst, "_ecmp", ecmp_sol.dag)
         print(f"ECMP Congestion: {ecmp_sol.congestion}")
 
-
         performance_ratio = ecmp_sol.congestion / opt_sol.opt_congestion
+
+        print(f"Performance Ratio:  {performance_ratio:0.3f}")
 
         if performance_ratio > sv.alpha + _eps:
             raise Exception("Alpha not equal to performance ratio")
@@ -532,13 +533,13 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
-    check_test_cases(cm)
+    # check_test_cases(cm)
 
     ig = InstanceGenerator(150, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(24, "failures")
-    # inspect_instance(7777, "tricky")
+    # inspect_instance(7777, "failures")
+    # inspect_instance(6689, "tricky")
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 5)
-    run_multiprocessing_suite(ig, cm, 8, 5000)
+    run_multiprocessing_suite(ig, cm, 8, 10000)
 
