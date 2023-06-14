@@ -40,7 +40,7 @@ class MySolver:
         return [
             node for node in range(1, self.dag.num_nodes)
             if self.has_path_to_violated(node)
-               and node not in self.violated_nodes
+            and node not in self.violated_nodes
         ]
 
     def update_loads(self, end):
@@ -150,12 +150,6 @@ class MySolver:
 
         for node in reversed(list(range(1, dag.num_nodes))):
             self.process_node(node)
-
-        # print(f"Succeeded with alpha = {self.alpha:0.3f}")
-
-        # if self.alpha >= 2:
-        #     save_instance("tmp", self.inst, 1)
-        #     raise Exception("Assumption failed, alpha >= 2")
 
         dag = DAG(dag.num_nodes, self.active_edges, make_parents(self.active_edges))
         return get_ecmp_DAG(dag, inst)

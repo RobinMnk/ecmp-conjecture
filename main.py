@@ -532,7 +532,7 @@ if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
-    # check_test_cases(cm)
+    check_test_cases(cm)
 
     ig = InstanceGenerator(150, False)
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
