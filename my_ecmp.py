@@ -32,7 +32,9 @@ class MySolver:
     violated_nodes = list()
     marked = list()
     removed = list()
-    alpha = 2
+    alpha = 1
+
+    num_cycles = 0
 
     def show(self):
         trimmed_inst = Instance(self.dag, self.inst.sources, self.inst.target, self.loads)
@@ -92,7 +94,8 @@ class MySolver:
     def fixup(self, current):
         self.violated_nodes = [current]
         self.removed = list()
-        self.marked = list()
+        # self.marked = list()
+        # self.update_loads(current)
 
         sequence = list()
 
@@ -121,13 +124,12 @@ class MySolver:
 
                 new_alpha = 2 - (degrees_X + num_low_edges) / (2 * (degrees_X + num_low_edges) + degrees_A)
 
-                print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
+                # print(f"Increasing alpha:  {self.alpha:0.3f}  ->  {new_alpha:0.3f}")
 
                 if new_alpha < self.alpha:
                     self.show()
                     save_instance_temp(self.inst)
                     raise Exception("Alpha should only increase!")
-
 
                 if new_alpha == self.alpha:
                     self.show()
@@ -158,7 +160,8 @@ class MySolver:
                     index = len(sequence) - ix - 1
                     cycle = list(map(lambda x: x[0], sequence[index:]))
                     print(f"Cycle of length {len(cycle)} detected:  {cycle}")
-                    nbs = [nb for s, nb in cycle if s == start]
+                    # nbs = [nb for s, nb in cycle if s == start]
+                    nbs = [cycle[0][1]]
                     for nb in nbs:
                         self.marked.append((start, nb))
                         if nb not in self.active_edges[start]:
@@ -169,6 +172,7 @@ class MySolver:
                     break
 
             if cycle_removed:
+                self.num_cycles += 1
                 continue
 
             sequence.append(entry)
@@ -225,8 +229,12 @@ class MySolver:
         for node in reversed(list(range(1, dag.num_nodes))):
             self.process_node(node)
 
+        self.show()
+
         # if self.alpha >= 2:
         #     raise Exception("Alpha >= 2")
+
+        print(f"{self.num_cycles} Cycles removed.")
 
         dag = DAG(dag.num_nodes, self.active_edges, make_parents(self.active_edges))
         return get_ecmp_DAG(dag, inst)
