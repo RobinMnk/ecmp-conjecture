@@ -16,7 +16,7 @@ def get_ecmp_DAG(dag: DAG, inst: Instance) -> ECMP_Sol:
     for node in reversed(range(1, inst.dag.num_nodes)):  # topologicalSort(dag):
         degree = len(dag.neighbors[node])
         if len(set(dag.neighbors[node])) < len(dag.neighbors[node]):
-            raise Exception("Double edges not allowed!")
+            raise Exception(f"Double edges not allowed!\n{set(dag.neighbors[node])}")
         if degree > 0:
             value = node_val[node] / degree
             for nb in dag.neighbors[node]:

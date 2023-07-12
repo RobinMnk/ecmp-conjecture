@@ -101,7 +101,9 @@ def get_edge_loads(dag: DAG):
     return edge_loads
 
 
-def instance_to_dot(instance: Instance, solution: DAG = None):
+def instance_to_dot(instance: Instance, solution: DAG = None, highlighted=None):
+    if highlighted is None:
+        highlighted = list()
     dot = graphviz.Digraph('ecmp-test', comment='ECMP Test')
     dot.node(str(0), "target", color="red")
     node_loads = instance.demands  # [0] * instance.dag.num_nodes #  get_node_loads(solution, instance)
@@ -113,15 +115,17 @@ def instance_to_dot(instance: Instance, solution: DAG = None):
             for nb in instance.dag.neighbors[node]:
                 sol_val = solution.neighbors[node] if solution is not None else []
                 part_of_solution = nb in sol_val and sol_val[nb] > 0
-                edge_color = "green" if part_of_solution else "black"
+                edge_color = "red" if (node, nb) in highlighted else ("green" if part_of_solution else "black")
                 label = f"{sol_val[nb]:.3f}".rstrip("0").rstrip(".") if part_of_solution else None
                 dot.edge(str(node), str(nb), color=edge_color, label=label)
 
     return dot.source
 
 
-def show_graph(instance: Instance, name: str, solution: DAG = None):
-    dot_source = instance_to_dot(instance, solution)
+def show_graph(instance: Instance, name: str, solution: DAG = None, highlighted=None):
+    if highlighted is None:
+        highlighted = list()
+    dot_source = instance_to_dot(instance, solution, highlighted)
     s = graphviz.Source(dot_source, filename=f"output/{name}", format="svg")
     s.render() #  engine="circo")
 

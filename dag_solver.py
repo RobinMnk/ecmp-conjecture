@@ -4,7 +4,7 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
-def optimal_solution_in_DAG(instance: Instance):
+def optimal_solution_in_DAG(instance: Instance) -> Solution:
     dag: DAG = instance.dag
     demands = instance.demands
     n = dag.num_nodes
