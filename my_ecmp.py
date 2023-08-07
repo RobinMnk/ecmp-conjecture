@@ -96,9 +96,9 @@ class MySolver:
             if node in self.violated_nodes:
                 continue
 
-            if any(z == node for z, _ in self.marked) and self.loads[node] < self.opt_node_loads[node]:
-                save_instance_temp(self.inst)
-                raise Exception("Marked Parent Node below threshold!!")
+            # if any(z == node for z, _ in self.marked) and self.loads[node] < self.opt_node_loads[node]:
+            #     save_instance_temp(self.inst)
+            #     raise Exception("Marked Parent Node below threshold!!")
 
             num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
             old_degree = len(self.active_edges[node])
@@ -118,9 +118,9 @@ class MySolver:
                 if candidates:
                     smallest_neighbor = min(candidates)
                     self.active_edges[node].remove(smallest_neighbor)
-                    # self.removed.append((node, smallest_neighbor))
                     self.update_loads(end)
                     return
+
         self.violated_nodes = [v for v in self.violated_nodes if self.is_node_violated(v)]
 
     def fixup(self, current):
@@ -139,39 +139,29 @@ class MySolver:
                    and nb not in self.violated_nodes
             ]  # all inactive edges leaving an active node
 
-            print(self.violated_nodes)
+            # print(self.violated_nodes)
 
-            critical_edges = [
-                (z, n) for z in active_nodes for n in self.active_edges[z]
-                if n not in active_nodes and n not in self.violated_nodes
-                if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
-                # if (z,n) in self.marked
-            ]
+            self.check_invariant(current)
 
-            # lost_flow = sum(
-            #     self.loads[z] / len(self.active_edges[z]) for z,_ in critical_edges
-            # )
+            # critical_edges = [
+            #     (z, n) for z in active_nodes for n in self.active_edges[z]
+            #     if n not in active_nodes and n not in self.violated_nodes
+            #     if self.loads[z] / len(self.active_edges[z]) < (self.alpha / 2) * self.OPT
+            #     # if (z,n) in self.marked
+            # ]
             #
-            # S = sum(
-            #     self.dag.neighbors[z][nb] for z,nb in critical_edges
-            # )
-            #
-            # demands_X = sum(self.inst.demands[v] for v in self.violated_nodes)
-            #
-            # if lost_flow < S:
-
-            if any(
-                    self.loads[z] / len(self.active_edges[z]) < self.dag.neighbors[z][re]
-                    # and self.loads[nb] < self.alpha * self.OPT * (len(self.dag.neighbors[nb]) - 0.5)
-                    for z, _ in critical_edges
-                    for re in self.active_edges[z]
-                    if (z, re) not in candidate_edges
-                        and self.has_path_to_violated(re, active_edges_only=False)
-            ):
-                # self.show(critical_edges)
-                # print("Noooo")
-                save_instance_temp(self.inst)
-                raise Exception("Assumption failed")
+            # if any(
+            #         self.loads[z] / len(self.active_edges[z]) < self.dag.neighbors[z][re]
+            #         # and self.loads[nb] < self.alpha * self.OPT * (len(self.dag.neighbors[nb]) - 0.5)
+            #         for z, _ in critical_edges
+            #         for re in self.active_edges[z]
+            #         if (z, re) not in candidate_edges
+            #             and self.has_path_to_violated(re, active_edges_only=False)
+            # ):
+            #     # self.show(critical_edges)
+            #     # print("Noooo")
+            #     save_instance_temp(self.inst)
+            #     raise Exception("Assumption failed")
 
             if not candidate_edges:
                 # shrunk_violated = [v for v in self.violated_nodes if self.is_node_violated(v)]
@@ -222,71 +212,22 @@ class MySolver:
             start, end = edge
 
             entry = (edge, hash_edge_set(self.active_edges))
+            if entry in sequence:
+                self.marked.append(edge)
+                smallest_neighbor = min(self.active_edges[start])
+                self.active_edges[start].remove(smallest_neighbor)
+                self.active_edges[start].append(end)
 
-            cycle_removed = False
-            for ix, comp in enumerate(reversed(sequence)):
-                if comp == entry:
-                    index = len(sequence) - ix - 1
-                    cycle = list(map(lambda x: x[0], sequence[index:]))
-                    print(f"Cycle of length {len(cycle)} detected:  {cycle}")
-
-                    # self.marked += cycle does not work!!
-
-                    top_highest_parent = max(cycle, key=lambda x: x[0])[0]
-                    children = [nb for x, nb in cycle if x == top_highest_parent]
-
-                    # if len(children) <= 1:
-                    #     self.show(cycle)
-                    #     print("NOOEE")
-                    # save_instance_temp(self.inst)
-                    # raise Exception("Should not happen")
-
-                    chosen_child = min(children, key=lambda x: self.dag.neighbors[top_highest_parent][x])
-
-                    deg_z = len(self.active_edges[top_highest_parent])
-                    opt_f = self.dag.neighbors[top_highest_parent][chosen_child]
-
-                    if self.loads[top_highest_parent] < self.opt_node_loads[top_highest_parent]:
-                        self.show([(top_highest_parent, chosen_child)])
-                        # print("Oh no!!")
-                        save_instance_temp(self.inst)
-                        raise Exception("Assumption Failed!!")
-                    else:
-                        print("ok")
-
-                    self.marked.append((top_highest_parent, chosen_child))
-                    if chosen_child not in self.active_edges[top_highest_parent]:
-                        self.active_edges[top_highest_parent].append(chosen_child)
-
-                    # for z, nb in cycle:
-                    #     self.marked.append((z, nb))
-                    #     if nb not in self.active_edges[z]:
-                    #         self.active_edges[z].append(nb)
-
-                    # nbs = [cycle[0][1]]
-                    # for nb in nbs:
-                    #     self.marked.append((start, nb))
-                    #     if nb not in self.active_edges[start]:
-                    #         self.active_edges[start].append(nb)
-
-                    self.update_loads(current)
-                    sequence.clear()
-                    cycle_removed = True
-                    break
-
-            if cycle_removed:
-                self.num_cycles += 1
+                self.update_loads(current)
+                sequence.clear()
                 continue
 
             sequence.append(entry)
 
-            # if edge in self.removed:
-            #     self.marked.append(edge)
-            # else:
             relief_edges = [
                 x for x in self.active_edges[start]
                 if (start, x) not in candidate_edges
-                   and self.has_path_to_violated(x, active_edges_only=False)
+                and self.has_path_to_violated(x, active_edges_only=False)
             ]
 
             neighbor_to_delete = relief_edges[0]
@@ -298,7 +239,7 @@ class MySolver:
                 self.active_edges[start].remove(neighbor_to_delete)
                 self.removed.append((start, neighbor_to_delete))
 
-            print(f"{edge}  <-   {(start, neighbor_to_delete)}")
+            # print(f"{edge}  <-   {(start, neighbor_to_delete)}")
 
             self.active_edges[start].append(end)
             self.update_loads(current)
@@ -322,6 +263,42 @@ class MySolver:
                 self.active_edges[node].append(neighbor)
                 self.loads[neighbor] += self.loads[node] / num_packets
 
+    def find(self, node, value):
+        if node == 0 or len(self.active_edges[node]) == 0:
+            return False
+
+        if self.loads[node] + value > self.alpha * self.OPT * len(self.dag.neighbors[node]):
+            return True
+
+        return any([
+            self.find(nb, value) for nb in self.active_edges[node]
+        ])
+
+    def check_invariant(self, start=1):
+        for z in range(start, self.dag.num_nodes):
+            if len(self.active_edges[z]) == 0:
+                continue
+
+            if z in self.violated_nodes:
+                continue
+
+            num_packets = math.ceil(self.loads[z] / (self.alpha * self.OPT))
+            if len(self.active_edges[z]) == num_packets:
+                continue
+
+            if self.loads[z] < self.opt_node_loads[z]:
+                self.show(self.active_edges[z])
+                raise Exception("sefsef")
+
+            # fl = self.loads[z] / len(self.active_edges[z])
+            # for nb in self.active_edges[z]:
+            #     if fl < self.dag.neighbors[z][nb] and not self.loads[nb] + fl > self.alpha * self.OPT * len(self.dag.neighbors[nb]):  # and not self.find(nb, fl):
+            #         # self.show([(z, nb)])
+            #         save_instance_temp(self.inst)
+            #         # skip = False
+            #         # if not skip:
+            #         raise Exception("NOPEEE")
+
     def solve(self, dag: DAG, inst: Instance, OPT) -> ECMP_Sol:
         self.dag = dag
         self.inst = inst
@@ -340,18 +317,18 @@ class MySolver:
 
         # self.show()
 
-        for z in range(1, self.dag.num_nodes):
-            if self.loads[z] == 0:
-                continue
-
-            fl = self.loads[z] / len(self.active_edges[z])
-
-            if fl >= self.alpha * self.OPT / 2:
-                continue
-
-            if any(z == t for t, _ in self.marked) and self.loads[z] < self.opt_node_loads[z]:
-                self.show([(z, self.active_edges[z][0])])
-                raise Exception("Noooo")
+        # for z in range(1, self.dag.num_nodes):
+        #     if self.loads[z] == 0:
+        #         continue
+        #
+        #     fl = self.loads[z] / len(self.active_edges[z])
+        #
+        #     if fl >= self.alpha * self.OPT / 2:
+        #         continue
+        #
+        #     if any(z == t for t, _ in self.marked) and self.loads[z] < self.opt_node_loads[z]:
+        #         self.show([(z, self.active_edges[z][0])])
+        #         raise Exception("Noooo")
 
             #
             # for nb in self.active_edges[z]:
@@ -371,6 +348,8 @@ class MySolver:
         #     raise Exception("Alpha >= 2")
 
         # print(f"{self.num_cycles} Cycles removed.")
+
+        self.check_invariant()
 
         dag = DAG(dag.num_nodes, self.active_edges, make_parents(self.active_edges))
         return get_ecmp_DAG(dag, inst)

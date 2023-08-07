@@ -7,7 +7,7 @@ from dag_solver import optimal_solution_in_DAG
 from model import *
 from ecmp import get_ALL_optimal_ECMP_sub_DAGs, iterate_sub_DAG, get_ecmp_DAG, get_optimal_ECMP_sub_DAG
 from conjectures import MAIN_CONJECTURE, Conjecture, LOADS_CONJECTURE, ALL_CONJECTURES, error_folder, _eps
-from my_ecmp import MySolver
+from other_ecmp import MySolver
 
 CHECK_ON_OPTIMAL_SUB_DAGS_ONLY = 0
 CHECK_ON_ALL_SUB_DAGS = 1
@@ -157,8 +157,9 @@ class ConjectureManager:
 
             performance_ratio = ecmp_solution.congestion / opt_solution.opt_congestion
 
-            # if performance_ratio > solver.alpha + _eps:
-            #     raise Exception("Alpha not equal to performance ratio")
+            if performance_ratio > solver.alpha + _eps:
+                save_instance_temp(inst)
+                raise Exception("Alpha not equal to performance ratio")
 
             if solution:
                 logger.info(f"Verified all conjectures for ECMP with my Algorithm"
@@ -358,7 +359,6 @@ def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=Fa
     return True
 
 
-
 def run_multiprocessing_suite(generator: InstanceGenerator, cm: ConjectureManager, num_processes, num_iterations):
     procs = []
     results = multiprocessing.Queue()
@@ -404,17 +404,6 @@ def inspect_instance(inst_id: int, folder: str):
         opt_sol = optimal_solution_in_DAG(inst)
         print(f"Optimal Congestion: {opt_sol.opt_congestion:0.4f}")
         trimmed_inst = Instance(opt_sol.dag, inst.sources, inst.target, inst.demands)
-        show_graph(trimmed_inst, "_trimmed", opt_sol.dag)
-
-        for i,d in enumerate(inst.demands):
-            inst.demands[i] = d / opt_sol.opt_congestion
-
-        for z in range(1, opt_sol.dag.num_nodes):
-            for nb in opt_sol.dag.neighbors[z]:
-                opt_sol.dag.neighbors[z][nb] /= opt_sol.opt_congestion
-
-        opt_sol = Solution(opt_sol.dag, 1)
-
         show_graph(trimmed_inst, "_trimmed", opt_sol.dag)
 
         sv = MySolver()
@@ -500,39 +489,32 @@ def new_test():
         print("Infeasible Model")
 
 
-def execute_test_cases(cm):
+def check_test_cases(cm):
     model.TESTCASE_RUNNING = True
     directory = "output/failures"
     inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
-    for inst_id in sorted(inst_ids)[1:]:
-        print(f"-- Checking Test ex_{inst_id}:  \t", end="")
+    for inst_id in sorted(inst_ids):
         inst = None
-        with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
-            inst = pickle.load(f)
+        try:
+            with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
+                inst = pickle.load(f)
+        except:
+            continue
+
+        print(f"-- Checking Test ex_{inst_id}:  \t", end="")
 
         if not check_single_instance(inst, cm, False, False):
-            return False
+            exit(1)
 
         print("PASSED! -- ")
 
+    logger = get_logger()
+    logger.info("")
+    logger.info("=" * 40)
+    logger.info(" " * 15 + "SUCCESS!!" + " " * 15)
+    logger.info("=" * 40)
+
     model.TESTCASE_RUNNING = False
-
-    return True
-
-
-def check_test_cases(cm):
-    time, success = time_execution(execute_test_cases, cm)
-
-    if success:
-        print("")
-        print("=" * 40)
-        print(" " * 8 + "ALL TEST CASES PASSED!!")
-        print("=" * 40)
-        print(f"Run completed in {time:0.2f}s")
-    else:
-        print("=" * 40)
-        print(f"Test Case failed after {time:0.2f}s")
-        exit(1)
 
 
 def custom_instance2():
@@ -542,8 +524,8 @@ def custom_instance2():
 
     parents = make_parents(neighbors)
     dag = DAG(len(neighbors), neighbors, parents)
-    sources = [3,4,9,10,11,12, 13]
-    demands = [0,0,0,1,1,0,0,0,0,1,1,1,1, 1]
+    sources = [3, 4, 9, 10, 11, 12, 13]
+    demands = [0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1]
     # sources = list(range(1, len(neighbors) + 1))
     # demands = [0] + [1] * (len(neighbors) - 1)
     inst = Instance(dag, sources, 0, demands)
@@ -551,27 +533,71 @@ def custom_instance2():
     show_graph(inst, "_tricky")
 
 
-def temp():
-    inst = None
-    with open(f"output/failures/ex_4000.pickle", "rb") as f:
-        inst = pickle.load(f)
+def lprec(s, i):
+    if i == len(s):
+        print(" ".join(s))
+        return
+    elif s[i] == '?':
+        s[i] = '0'
+        lprec(s, i+1)
+        s[i] = '1'
+        lprec(s, i+1)
+        s[i] = "?"
+    else:
+        lprec(s, i+1)
 
-    inst.sources.pop()
-    save_instance("failures", inst, 4000)
+def lprec2(s, i):
+    if i == len(s):
+        print(" ".join(s))
+        return
+    elif s[i] == '?':
+        s1 = [x for x in s]
+        s1[i] = "0"
+        lp(s1)
+        s2 = [x for x in s]
+        s2[i] = "1"
+        lp(s2)
+    else:
+        lprec(s, i + 1)
+
+def lpit(s):
+    comp = True
+    for i, c in enumerate(s):
+        if c == "?":
+            s1 = [x for x in s]
+            s1[i] = "0"
+            lpit(s1)
+
+            s2 = [x for x in s]
+            s2[i] = "1"
+            lpit(s2)
+
+            # s[i] = "1"
+            # lpit(s)
+            # s[i] = "?"
+            comp = False
+            return
+            # break
+    if comp:
+        print(" ".join(s))
+
+def lp(s):
+    lprec(s, 0)
 
 
 if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
+    # lpit(list("???"))
+
     check_test_cases(cm)
 
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(15132, "failures")
+    # inspect_instance(1, "failures")
     # inspect_instance(6689, "tricky")
     # inspect_instance(1, "tmp")
+    # run_single_test_suite(ig, cm, 5000)
 
-    # ig = InstanceGenerator(100, True)
-    # run_multiprocessing_suite(ig, cm, 8, 20000)
-    # run_single_test_suite(ig, cm, 1000)
-
+    # ig = InstanceGenerator(100, False)
+    # run_multiprocessing_suite(ig, cm, 8, 50000)
