@@ -27,12 +27,13 @@ RESULT_ERROR = 3
 
 
 class InstanceGenerator:
-    def __init__(self, max_nodes: int, arbitrary_demands=True):
+    def __init__(self, max_nodes: int, arbitrary_demands=True, force_size=False):
         # if max_nodes >= 50:
         #     raise RuntimeWarning("The value for max_nodes is too large. Expect (seriously) long runtime!")
 
         self.max_nodes = max_nodes
         self.arbitrary_demands = arbitrary_demands
+        self.force_size = force_size
 
         random_bytes = os.urandom(8)
         seed = int.from_bytes(random_bytes, byteorder="big")
@@ -42,7 +43,7 @@ class InstanceGenerator:
         print(f"Used Seed: {seed}")
 
     def __next__(self):
-        size = random.randint(4, self.max_nodes)
+        size = self.max_nodes if self.force_size else random.randint(4, self.max_nodes)
         prob = random.random() * 0.5 + 0.1
         logger = get_logger()
         logger.info(f"Building Instance on {size} nodes with edge probability {prob:0.3f}")
@@ -234,15 +235,18 @@ class ConjectureManager:
 
         return RESULT_COUNTEREXAMPLE
 
-    def verify_instance(self, inst: Instance, index: int, show_results=False):
+    def verify_instance(self, inst: Instance, index: int, show_results=False, opt_sol: Solution=None):
         logger = get_logger()
         if not self.conjectures_to_check:
             print("No Conjectures to check")
             logger.error("NO CONJECTURES TO CHECK!")
             return RESULT_ERROR
 
-        sol_time, opt_solution = time_execution(optimal_solution_in_DAG, inst)
-        logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
+        if opt_sol is not None:
+            opt_solution = opt_sol
+        else:
+            sol_time, opt_solution = time_execution(optimal_solution_in_DAG, inst)
+            logger.info(f"Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
 
         if opt_solution is None:
             logger.info("-> Infeasible Instance!")
@@ -341,14 +345,14 @@ def run_single_test_suite(generator: InstanceGenerator,
         multiprocessing_results.put(True)
 
 
-def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=False, log_to_stdout=True):
+def check_single_instance(inst: Instance, cm: ConjectureManager, show_results=False, log_to_stdout=True, opt_sol: Solution = None):
     setup_logger(log_to_stdout)
     logger = get_logger()
 
     logger.info("-" * 72)
     id_ = random.randint(100, 10000)
     logger.info(f"Checking Single Instance: (ID: {id_})")
-    result = cm.verify_instance(inst, 1, show_results=show_results)
+    result = cm.verify_instance(inst, 1, show_results=show_results, opt_sol=opt_sol)
     if result == RESULT_COUNTEREXAMPLE:
         logger.error("=" * 50)
         logger.error(f"  !!! {multiprocessing.current_process().name} FOUND A COUNTER EXAMPLE !!!")
@@ -491,19 +495,32 @@ def new_test():
 
 def check_test_cases(cm):
     model.TESTCASE_RUNNING = True
-    directory = "output/failures"
-    inst_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(directory))
-    for inst_id in sorted(inst_ids):
+    failure_directory = "output/failures"
+    from_failure_ids = sorted(map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(failure_directory)))
+    from_failure_cases = list(map(lambda x: (x, f"ex_{x}", f"{failure_directory}/ex_{x}.pickle", None), from_failure_ids))
+
+    large_cases_dir = "output/large_instances"
+    large_cases_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(large_cases_dir))
+    large_cases = list(map(lambda x: (x, f"inst_{x}_L", f"{large_cases_dir}/inst_{x}.pickle", f"{large_cases_dir}/sol_{x}.pickle"), large_cases_ids))
+
+    test_cases = from_failure_cases
+
+    for inst_id, inst_name, path, solpath in test_cases:
         inst = None
+        sol = None
         try:
-            with open(f"{directory}/ex_{inst_id}.pickle", "rb") as f:
+            with open(path, "rb") as f:
                 inst = pickle.load(f)
+
+            if solpath is not None:
+                with open(solpath, "rb") as f:
+                    sol = pickle.load(f)
         except:
             continue
 
-        print(f"-- Checking Test ex_{inst_id}:  \t", end="")
+        print(f"-- Checking Test {inst_name}:  \t", end="")
 
-        if not check_single_instance(inst, cm, False, False):
+        if not check_single_instance(inst, cm, False, False, opt_sol=sol):
             exit(1)
 
         print("PASSED! -- ")
@@ -536,7 +553,6 @@ def custom_instance2():
 def lprec(s, i):
     if i == len(s):
         print(" ".join(s))
-        return
     elif s[i] == '?':
         s[i] = '0'
         lprec(s, i+1)
@@ -581,23 +597,66 @@ def lpit(s):
     if comp:
         print(" ".join(s))
 
+
+def fail(s):
+    if not s:
+        print()
+        return
+
+    if s[0] == "?":
+        print(1, end="")
+        fail(s[1:])
+        print(0, end="")
+        fail(s[1:])
+    else:
+        print(s[0], end="")
+        fail(s[1:])
+
+
 def lp(s):
-    lprec(s, 0)
+    fail(list(s))
+
+def create_large_instances(num):
+    ig = InstanceGenerator(1000, False, force_size=True)
+    successes = 0
+    iterations = 0
+    print(f"- - Begin instance 1 - -")
+    while successes < num and iterations < 4 * num:
+        iterations += 1
+        inst = next(ig)
+        sol_time, opt_solution = time_execution(optimal_solution_in_DAG, inst)
+        print(f" Calculated optimal solution\t{f'({sol_time:0.2f}s)' if sol_time > 1 else ''}")
+
+        if opt_solution is None:
+            print("  -> Infeasible")
+            continue
+
+        inst_file = f"output/large_instances/inst_{successes}.pickle"
+        with open(inst_file, "wb") as f:
+            pickle.dump(inst, f, pickle.HIGHEST_PROTOCOL)
+
+        sol_file = f"output/large_instances/sol_{successes}.pickle"
+        with open(sol_file, "wb") as f:
+            pickle.dump(opt_solution, f, pickle.HIGHEST_PROTOCOL)
+
+        successes += 1
+        print(" == SAVED ==\n")
+        print(f"- - Begin instance {successes+1} - -")
 
 
 if __name__ == '__main__':
     cm = ConjectureManager(CHECK_WITH_MY_ALGORITHM, ECMP_FORWARDING, log_run_to_file=False)
     cm.register(MAIN_CONJECTURE)
 
-    # lpit(list("???"))
+    # create_large_instances(10)
 
-    check_test_cases(cm)
+    # check_test_cases(cm)
 
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(1, "failures")
+    inspect_instance(1, "failures")
     # inspect_instance(6689, "tricky")
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 5000)
 
-    # ig = InstanceGenerator(100, False)
+    # ig = InstanceGenerator(200, False)
     # run_multiprocessing_suite(ig, cm, 8, 50000)

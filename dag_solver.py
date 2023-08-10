@@ -4,6 +4,10 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
+def dd():
+    return defaultdict(float)
+
+
 def optimal_solution_in_DAG(instance: Instance) -> Solution:
     dag: DAG = instance.dag
     demands = instance.demands
@@ -49,7 +53,7 @@ def optimal_solution_in_DAG(instance: Instance) -> Solution:
         opt_cong = m.ObjVal
 
         # Build Solution DAG
-        sol_dag_edges = defaultdict(lambda: defaultdict(float))
+        sol_dag_edges = defaultdict(dd)
         parents = defaultdict(list)
 
         for i in range(1, n):

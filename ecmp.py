@@ -15,7 +15,7 @@ def get_ecmp_DAG(dag: DAG, inst: Instance, all_checks=True) -> ECMP_Sol:
     for node in reversed(range(1, inst.dag.num_nodes)):  # topologicalSort(dag):
         degree = len(dag.neighbors[node])
         if len(set(dag.neighbors[node])) < len(dag.neighbors[node]):
-            raise Exception(f"Double edges not allowed!\n{set(dag.neighbors[node])}")
+            raise Exception(f"Double edges not allowed!\n{node} -> {dag.neighbors[node]}")
         if all_checks and node_val[node] > 0 and len(dag.neighbors[node]) == 0:
             raise Exception(f"Node {node} has positive load but no outgoing edge!")
         if degree > 0:
