@@ -75,13 +75,23 @@ class MySolver:
         return node > 0 and self.loads[node] > self.alpha * self.OPT * len(self.active_edges[node])
         # return node > 0 and self.loads[node] > self.alpha * self.OPT * len(self.dag.neighbors[node])
 
-    def add_edge(self, start, end):
+    def add_edge(self, start, end, verbose=True):
         if end in self.active_edges[start]:
             raise Exception("ERROR: Edge already exists!")
-        self.active_edges[start].append(end)
 
-    def remove_edge(self, start, end):
+        if len(self.active_edges[start]) > 0 and self.dag.neighbors[start][end] > self.loads[start] / (len(self.active_edges[start]) + 1):
+            raise Exception("Adding this edge violates invariant!")
+
+        if verbose:
+            print(f"  Adding {start} -> {end}")
+        self.active_edges[start].append(end)
+        self.update_loads()
+
+    def remove_edge(self, start, end, verbose=True):
+        if verbose:
+            print(f"  Removing {start} -> {end}")
         self.active_edges[start].remove(end)
+        self.update_loads()
 
     def potential(self):
         return sum(
@@ -114,62 +124,158 @@ class MySolver:
         sol = get_ecmp_DAG(dag, self.inst, all_checks=False)
         self.loads = [ld for ld in sol.loads]
 
+        # self.show()
+
+        # print(f"\t\t\t\t\t\t\t\t\t\tPotential: {self.potential():.1f}")
+
     # def propagate(self, node):
     #
     #     for nb in self.active_edges[node]:
     #         self.propagate(nb)
 
-    def propagate_reduce(self, node, val):
+    # def propagate_reduce(self, node, val):
+    #     if node == 0:
+    #         return
+    #
+    #     self.loads[node] -= val
+    #     forwarded = val / len(self.active_edges[node])
+    #
+    #     #  Maintain Invariant after flow reduction
+    #     t_nb = self.check_invariant_node(node)
+    #     while t_nb is not None:
+    #         fl = self.loads[node] / len(self.active_edges[node])
+    #         self.remove_edge(node, t_nb)
+    #         self.propagate_reduce(t_nb, fl)
+    #
+    #         new_fl = self.loads[node] / len(self.active_edges[node])
+    #         diff = new_fl - fl
+    #         forwarded += diff / len(self.active_edges[node])
+    #         t_nb = self.check_invariant_node(node)
+    #
+    #     for nb in self.active_edges[node]:
+    #         self.propagate_increase(nb, forwarded)
+    #
+    # def propagate_increase(self, node, val):
+    #     if node == 0:
+    #         return
+    #
+    #     self.loads[node] += val
+    #     forwarded = val / len(self.active_edges[node])
+    #
+    #     made_update = False
+    #     while not made_update and self.loads[node] > self.alpha * self.OPT * len(self.active_edges[node]):
+    #         fl = self.loads[node] / len(self.active_edges[node])
+    #         num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
+    #         made_update = True
+    #
+    #         if num_packets < len(self.dag.neighbors[node]):
+    #             # Try to open new edge
+    #             for nb in self.dag.neighbors[node]:
+    #                 if nb not in self.active_edges[node] and fl >= self.dag.neighbors[node][nb]:
+    #                     print(f"Opening {node} -> {nb}")
+    #                     self.add_edge(node, nb)
+    #                     new_fl = self.loads[node] / len(self.active_edges[node])
+    #                     diff = new_fl - fl
+    #                     forwarded += diff / len(self.active_edges[node])
+    #                     made_update = False
+    #                     break
+    #
+    #     for nb in self.active_edges[node]:
+    #         self.propagate_increase(nb, forwarded)
+
+    def dfs(self, node):
         if node == 0:
             return
 
-        self.loads[node] -= val
-        forwarded = val / len(self.active_edges[node])
+        if len(self.dag.neighbors[node]) > len(self.active_edges[node]) > 1:
 
-        #  Maintain Invariant after flow reduction
-        t_nb = self.check_invariant_node(node)
-        while t_nb is not None:
-            fl = self.loads[node] / len(self.active_edges[node])
-            self.remove_edge(node, t_nb)
-            self.propagate_reduce(t_nb, fl)
+            pot = sum(
+                self.dag.neighbors[node][nb]
+                for nb in self.active_edges[node]
+            )
+            s = f" DFS node {node}, from {self.active_edges[node]} ({pot:.2f})"
+            self.active_edges[node].clear()
 
-            new_fl = self.loads[node] / len(self.active_edges[node])
-            diff = new_fl - fl
-            forwarded += diff / len(self.active_edges[node])
-            t_nb = self.check_invariant_node(node)
+            neighbors = sorted(self.dag.neighbors[node].keys(),
+                key=lambda x: self.dag.neighbors[node][x],
+                reverse=True
+            )
 
-        for nb in self.active_edges[node]:
-            self.propagate_increase(nb, forwarded)
+            # num_edges = 0
+            # for nb in neighbors:
+            #     next_fl = self.loads[node] / (num_edges + 1)
+            #     if num_edges > 0 and next_fl < self.dag.neighbors[node][nb]:
+            #         break
+            #
+            #     self.add_edge(node, nb, verbose=False)
+            #     num_edges += 1
 
-    def propagate_increase(self, node, val):
-        if node == 0:
-            return
+            degree = len(self.dag.neighbors[node])
+            best = -1
+            new_nbs = list()
+            for num_edges in range(1, degree):
+                fl = self.loads[node] / num_edges
 
-        self.loads[node] += val
-        forwarded = val / len(self.active_edges[node])
+                st = 0
+                while st < degree and fl < self.dag.neighbors[node][neighbors[st]]:
+                    st += 1
 
-        made_update = False
-        while not made_update and self.loads[node] > self.alpha * self.OPT * len(self.active_edges[node]):
-            fl = self.loads[node] / len(self.active_edges[node])
-            num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
-            made_update = True
+                if st + num_edges > degree:
+                    continue
 
-            if num_packets < len(self.dag.neighbors[node]):
-                # Try to open new edge
-                for nb in self.dag.neighbors[node]:
-                    if nb not in self.active_edges[node] and fl >= self.dag.neighbors[node][nb]:
-                        print(f"Opening {node} -> {nb}")
-                        self.add_edge(node, nb)
-                        new_fl = self.loads[node] / len(self.active_edges[node])
-                        diff = new_fl - fl
-                        forwarded += diff / len(self.active_edges[node])
-                        made_update = False
-                        break
+                nbs = neighbors[st:st+num_edges]
 
-        for nb in self.active_edges[node]:
-            self.propagate_increase(nb, forwarded)
+                current = sum(
+                    self.dag.neighbors[node][nb]
+                    for nb in nbs
+                )
 
+                if current > best:
+                    best = current
+                    new_nbs = nbs
 
+            for nb in new_nbs:
+                self.add_edge(node, nb, verbose=False)
+
+            new_pot = sum(
+                self.dag.neighbors[node][nb]
+                for nb in self.active_edges[node]
+            )
+
+            print(f"{s} to {self.active_edges[node]} ({new_pot:.2f})")
+
+            if new_pot + _eps < pot:
+                raise Exception("Potential decreased!")
+
+            self.update_loads()
+
+        # t_nb = self.check_invariant_node(node)
+        # # print(f"{node}: {t_nb}")
+        # while t_nb is not None:
+        #     num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
+        #     if len(self.active_edges[node]) == num_packets:
+        #         raise Exception("HERE")
+        #     self.remove_edge(node, t_nb)
+        #     self.dfs(t_nb)
+        #     t_nb = self.check_invariant_node(node)
+        #
+        # made_update = False
+        # while not made_update and self.loads[node] > self.alpha * self.OPT * len(self.active_edges[node]):
+        #     fl = self.loads[node] / len(self.active_edges[node])
+        #     num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
+        #     made_update = True
+        #
+        #     if num_packets < len(self.dag.neighbors[node]):
+        #         pot_fl = self.loads[node] / (len(self.active_edges[node]) + 1)
+        #         # Try to open new edge
+        #         for nb in self.dag.neighbors[node]:
+        #             if nb not in self.active_edges[node] and pot_fl >= self.dag.neighbors[node][nb]:
+        #                 self.add_edge(node, nb)
+        #                 made_update = False
+        #                 break
+
+        for nb in list(self.dag.neighbors[node].keys()):
+            self.dfs(nb)
 
     def fixup(self):
         # self.violated_nodes = [current]
@@ -193,8 +299,11 @@ class MySolver:
 
             counter += 1
 
+            print(f"\t\t\t\t\t\t\t\t\t\tPotential: {self.potential():.1f}")
+
             if counter > 100:
-                self.show([e for e, _ in sequence])
+                # self.show([e for e, _ in sequence])
+                self.show(sequence)
                 # save_instance_temp(self.inst)
                 stop = True
                 if stop:
@@ -203,7 +312,6 @@ class MySolver:
                     continue
 
             # print(self.violated_nodes)
-            print(f"{self.potential():.1f}")
 
             if not candidate_edges:
                 self.show()
@@ -221,20 +329,22 @@ class MySolver:
             edge = min(candidate_edges, key=lambda x: self.dag.neighbors[x[0]][x[1]])
             start, end = edge
 
-            entry = (edge, hash_edge_set(self.active_edges))
-            if entry in sequence:
-                # self.marked.append(edge)
-                # smallest_neighbor = min(self.active_edges[start])
-                # self.active_edges[start].remove(smallest_neighbor)
-                # self.active_edges[start].append(end)
+            # entry = (edge, hash_edge_set(self.active_edges))
+            # if entry in sequence:
+            #     # self.marked.append(edge)
+            #     # smallest_neighbor = min(self.active_edges[start])
+            #     # self.active_edges[start].remove(smallest_neighbor)
+            #     # self.active_edges[start].append(end)
+            #
+            #     # self.show([e for e,_ in sequence])
+            #
+            #     # self.update_loads(current)
+            #     # sequence.clear()
+            #     continue
 
-                # self.show([e for e,_ in sequence])
+            sequence.append(edge)
 
-                # self.update_loads(current)
-                # sequence.clear()
-                continue
 
-            sequence.append(entry)
 
             # sequence.append(edge)
 
@@ -244,34 +354,30 @@ class MySolver:
                 and self.has_path_to_violated(x, active_edges_only=False)
             ]
 
-            neighbor_to_delete = max(relief_edges, key=lambda x: self.dag.neighbors[start][x])
-
-            fl = self.loads[start] / len(self.active_edges[start])
-
+            neighbor_to_delete = min(relief_edges, key=lambda x: self.dag.neighbors[start][x])
             self.remove_edge(start, neighbor_to_delete)
-            self.removed.append((start, neighbor_to_delete))
-            self.propagate_reduce(neighbor_to_delete, fl)
 
-            # print(f"{edge}  <-   {(start, neighbor_to_delete)}")
+            print(f"{edge}  <-   {(start, neighbor_to_delete)}")
 
-            if len(self.active_edges[start]) == 0 or self.dag.neighbors[start][neighbor_to_delete] >= self.dag.neighbors[start][end]:
+            # len(self.active_edges[start]) == 0 \
+            if self.dag.neighbors[start][neighbor_to_delete] < self.dag.neighbors[start][end]:
                 self.add_edge(start, end)
-                self.propagate_increase(end, fl)
-            else:
-                new_fl = self.loads[start] / len(self.active_edges[start])
-                diff = new_fl - fl
-                for nb in self.active_edges[start]:
-                    self.propagate_increase(nb, diff / len(self.active_edges[start]))
 
-            # self.update_loads()
-            # self.propagate(start)
-            self.update_loads()
+            # self.dfs(start)
+            print(f"\nStarting DFS from {neighbor_to_delete}")
+            self.dfs(neighbor_to_delete)
+            for nb in self.active_edges[start]:
+                print(f"\nStarting DFS from {nb}")
+                self.dfs(nb)
             self.check_invariant(0)
-            # self.remove_all_low_edges()
 
     def check_invariant_node(self, node):
         if self.loads[node] == 0 or len(self.active_edges[node]) < 2:
             return None
+
+        num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
+        if len(self.active_edges[node]) < num_packets:
+            raise Exception("HERE")
 
         fl = self.loads[node] / len(self.active_edges[node])
 
@@ -281,13 +387,14 @@ class MySolver:
 
         return None
 
-    def check_invariant(self, end):
+    def check_invariant(self, end=0):
         for node in range(end, self.dag.num_nodes):
             troubled_nb = self.check_invariant_node(node)
+
             if troubled_nb is not None:
                 self.show([(node, troubled_nb)])
                 # save_instance_temp(self.inst)
-                raise Exception("Invariant failed!")
+                raise Exception(f"Invariant failed! {node}")
 
 
     def process_node(self, node):
@@ -305,8 +412,6 @@ class MySolver:
                 self.remove_edge(node, smallest_neighbor)
             else:
                 break
-
-        self.update_loads()
 
     def remove_all_low_edges(self):
         for node in range(self.num_nodes - 1, 0, -1):
