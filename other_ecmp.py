@@ -46,10 +46,20 @@ class MySolver:
     removed = list()
     alpha = 2
     num_nodes: int
+    begin = False
 
     num_cycles = 0
 
     opt_node_loads = list()
+
+    def active_degree(self, node):
+        return len(self.active_edges[node])
+
+    def general_degree(self, node):
+        return len(self.dag.neighbors[node])
+
+    def flow_leaving(self, node):
+        return self.loads[node] / self.active_degree(node) if self.active_degree(node) > 0 else 0
 
     def dag_with_deletion(self, with_deletion=None):
         if with_deletion is None:
@@ -122,7 +132,36 @@ class MySolver:
         """ loads can (and should) be maintained automatically, this version is very inefficient """
         dag = DAG(self.dag.num_nodes, self.active_edges, [])
         sol = get_ecmp_DAG(dag, self.inst, all_checks=False)
-        self.loads = [ld for ld in sol.loads]
+
+        for node in reversed(range(1, self.dag.num_nodes)):
+            if sol.loads[node] == self.loads[node]:
+                continue
+
+            if len(self.active_edges[node]) > 1:
+                print(f"On node {node}")
+                new_fl = sol.loads[node] / len(self.active_edges[node])
+
+                # if sol.loads[node] < self.loads[node]:
+                for nb in self.active_edges[node]:
+                    if new_fl + _eps < self.dag.neighbors[node][nb]:
+                        self.remove_edge(node, nb)
+                        return
+
+                if sol.loads[node] > self.loads[node]:
+                    if sol.loads[node] > self.alpha * self.OPT * self.active_degree(node):
+                        if self.active_degree(node) < self.general_degree(node):
+                            self.open_all_possible_edges(node)
+                            return
+                        # if self.active_degree(node) < self.general_degree(node):
+                        #     min_nb = min([
+                        #         nb for nb in self.dag.neighbors[node]
+                        #         if nb not in self.active_edges[node]
+                        #     ], key=lambda x: self.dag.neighbors[node][x])
+                        #     self.add_edge(node, min_nb)
+                        #     return
+
+            self.loads[node] = sol.loads[node]
+
 
         # self.show()
 
@@ -183,17 +222,58 @@ class MySolver:
     #     for nb in self.active_edges[node]:
     #         self.propagate_increase(nb, forwarded)
 
+    def open_all_possible_edges(self, node):
+
+        print(f"Opening all possible edges for {node}")
+
+        self.active_edges[node].clear()
+
+        neighbors = sorted(self.dag.neighbors[node].keys(),
+                           key=lambda x: self.dag.neighbors[node][x],
+                           reverse=True
+                           )
+
+        degree = len(self.dag.neighbors[node])
+        best = -1
+        new_nbs = list()
+        for num_edges in range(1, degree + 1):
+            fl = self.loads[node] / num_edges
+
+            st = 0
+            while st < degree and fl < self.dag.neighbors[node][neighbors[st]]:
+                st += 1
+
+            if st + num_edges > degree:
+                continue
+
+            nbs = neighbors[st:st + num_edges]
+
+            current = sum(
+                self.dag.neighbors[node][nb]
+                for nb in nbs
+            )
+
+            if current > best:
+                best = current
+                new_nbs = nbs
+
+        for nb in new_nbs:
+            self.active_edges[node].append(nb)
+
+        self.update_loads()
+
     def dfs(self, node):
         if node == 0:
             return
 
-        if len(self.dag.neighbors[node]) > len(self.active_edges[node]) > 1:
+        print(f" DFS node {node}, from {self.active_edges[node]}")
+
+        if len(self.dag.neighbors[node]) >= len(self.active_edges[node]) > 1:
 
             pot = sum(
                 self.dag.neighbors[node][nb]
                 for nb in self.active_edges[node]
             )
-            s = f" DFS node {node}, from {self.active_edges[node]} ({pot:.2f})"
             self.active_edges[node].clear()
 
             neighbors = sorted(self.dag.neighbors[node].keys(),
@@ -213,7 +293,7 @@ class MySolver:
             degree = len(self.dag.neighbors[node])
             best = -1
             new_nbs = list()
-            for num_edges in range(1, degree):
+            for num_edges in range(1, degree+1):
                 fl = self.loads[node] / num_edges
 
                 st = 0
@@ -242,10 +322,10 @@ class MySolver:
                 for nb in self.active_edges[node]
             )
 
-            print(f"{s} to {self.active_edges[node]} ({new_pot:.2f})")
+            print(f"   to {self.active_edges[node]} ({new_pot:.2f})")
 
-            if new_pot + _eps < pot:
-                raise Exception("Potential decreased!")
+            # if new_pot + _eps < pot:
+            #     raise Exception("Potential decreased!")
 
             self.update_loads()
 
@@ -299,11 +379,11 @@ class MySolver:
 
             counter += 1
 
-            print(f"\t\t\t\t\t\t\t\t\t\tPotential: {self.potential():.1f}")
+            # print(f"Potential: {self.potential():.1f}")
 
             if counter > 100:
-                # self.show([e for e, _ in sequence])
-                self.show(sequence)
+                self.show([e for e, _ in sequence])
+                # self.show(sequence)
                 # save_instance_temp(self.inst)
                 stop = True
                 if stop:
@@ -329,22 +409,26 @@ class MySolver:
             edge = min(candidate_edges, key=lambda x: self.dag.neighbors[x[0]][x[1]])
             start, end = edge
 
-            # entry = (edge, hash_edge_set(self.active_edges))
-            # if entry in sequence:
-            #     # self.marked.append(edge)
-            #     # smallest_neighbor = min(self.active_edges[start])
-            #     # self.active_edges[start].remove(smallest_neighbor)
-            #     # self.active_edges[start].append(end)
-            #
-            #     # self.show([e for e,_ in sequence])
-            #
-            #     # self.update_loads(current)
-            #     # sequence.clear()
-            #     continue
+            entry = (edge, hash_edge_set(self.active_edges))
+            if entry in sequence:
+                # self.marked.append(edge)
+                # smallest_neighbor = min(self.active_edges[start])
+                # self.active_edges[start].remove(smallest_neighbor)
+                # self.active_edges[start].append(end)
 
-            sequence.append(edge)
+                # self.show([e for e,_ in sequence])
 
+                # self.update_loads(current)
+                # sequence.clear()
 
+                for (f, t), _ in sequence:
+                    if t not in self.active_edges[f]:
+                        self.active_edges[f].append(t)
+
+                self.update_loads()
+                continue
+
+            sequence.append(entry)
 
             # sequence.append(edge)
 
@@ -354,21 +438,23 @@ class MySolver:
                 and self.has_path_to_violated(x, active_edges_only=False)
             ]
 
+            fl = self.flow_leaving(start)
+
             neighbor_to_delete = min(relief_edges, key=lambda x: self.dag.neighbors[start][x])
             self.remove_edge(start, neighbor_to_delete)
 
             print(f"{edge}  <-   {(start, neighbor_to_delete)}")
 
             # len(self.active_edges[start]) == 0 \
-            if self.dag.neighbors[start][neighbor_to_delete] < self.dag.neighbors[start][end]:
+            if fl >= self.dag.neighbors[start][end]:
                 self.add_edge(start, end)
 
             # self.dfs(start)
-            print(f"\nStarting DFS from {neighbor_to_delete}")
-            self.dfs(neighbor_to_delete)
-            for nb in self.active_edges[start]:
-                print(f"\nStarting DFS from {nb}")
-                self.dfs(nb)
+            # print(f"\nStarting DFS from {neighbor_to_delete}")
+            # self.dfs(neighbor_to_delete)
+            # for nb in self.active_edges[start]:
+            #     print(f"\nStarting DFS from {nb}")
+            #     self.dfs(nb)
             self.check_invariant(0)
 
     def check_invariant_node(self, node):
@@ -376,8 +462,8 @@ class MySolver:
             return None
 
         num_packets = math.ceil(self.loads[node] / (self.alpha * self.OPT))
-        if len(self.active_edges[node]) < num_packets:
-            raise Exception("HERE")
+        # if len(self.active_edges[node]) < num_packets:
+        #     raise Exception("HERE")
 
         fl = self.loads[node] / len(self.active_edges[node])
 
@@ -394,7 +480,9 @@ class MySolver:
             if troubled_nb is not None:
                 self.show([(node, troubled_nb)])
                 # save_instance_temp(self.inst)
-                raise Exception(f"Invariant failed! {node}")
+                raise Exception(f"Invariant failed on Edge ({node} -> {troubled_nb}) \n "
+                                f"It has load {self.flow_leaving(node):.2f} "
+                                f"but opt flow is {self.dag.neighbors[node][troubled_nb]:.2f}")
 
 
     def process_node(self, node):
@@ -433,6 +521,8 @@ class MySolver:
         self.opt_node_loads = get_node_loads(dag, inst)
 
         self.remove_all_low_edges()
+
+        self.begin = True
 
         print(f"Starting Potential: {self.potential():0.1f}")
 
