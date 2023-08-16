@@ -497,13 +497,13 @@ def check_test_cases(cm):
     model.TESTCASE_RUNNING = True
     failure_directory = "output/failures"
     from_failure_ids = sorted(map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(failure_directory)))
-    from_failure_cases = list(map(lambda x: (x, f"ex_{x}", f"{failure_directory}/ex_{x}.pickle", None), from_failure_ids))
+    from_failure_cases = list(map(lambda x: (x, f"ex_{x}", f"{failure_directory}/ex_{x}.pickle", ""), from_failure_ids))
 
     large_cases_dir = "output/large_instances"
     large_cases_ids = map(lambda file: int(file.split("_")[1].split(".")[0]), os.listdir(large_cases_dir))
     large_cases = list(map(lambda x: (x, f"inst_{x}_L", f"{large_cases_dir}/inst_{x}.pickle", f"{large_cases_dir}/sol_{x}.pickle"), large_cases_ids))
 
-    test_cases = from_failure_cases
+    test_cases = from_failure_cases + large_cases
 
     for inst_id, inst_name, path, solpath in test_cases:
         inst = None
@@ -512,7 +512,7 @@ def check_test_cases(cm):
             with open(path, "rb") as f:
                 inst = pickle.load(f)
 
-            if solpath is not None:
+            if solpath:
                 with open(solpath, "rb") as f:
                     sol = pickle.load(f)
         except:
@@ -650,10 +650,10 @@ if __name__ == '__main__':
 
     # create_large_instances(10)
 
-    # check_test_cases(cm)
+    check_test_cases(cm)
 
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    inspect_instance(1, "failures")
+    # inspect_instance(1, "failures")
     # inspect_instance(6689, "tricky")
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 5000)
