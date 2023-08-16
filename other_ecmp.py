@@ -414,29 +414,29 @@ class MySolver:
             #                else max(self.inst.demands) + 1
             #            ))
             # edge = min(candidate_edges, key=lambda x: float("inf") if x in self.removed else self.dag.neighbors[x[0]][x[1]])
-            edge = min(candidate_edges, key=lambda x: self.dag.neighbors[x[0]][x[1]])
+            edge = min(candidate_edges, key=lambda x: x[1])  # self.dag.neighbors[x[0]][x[1]])
             start, end = edge
 
-            entry = (edge, hash_edge_set(self.active_edges))
-            if entry in sequence:
-                # self.marked.append(edge)
-                # smallest_neighbor = min(self.active_edges[start])
-                # self.active_edges[start].remove(smallest_neighbor)
-                # self.active_edges[start].append(end)
+            # entry = (edge, hash_edge_set(self.active_edges))
+            # if entry in sequence:
+            #     # self.marked.append(edge)
+            #     # smallest_neighbor = min(self.active_edges[start])
+            #     # self.active_edges[start].remove(smallest_neighbor)
+            #     # self.active_edges[start].append(end)
+            #
+            #     # self.show([e for e,_ in sequence])
+            #
+            #     # self.update_loads(current)
+            #     # sequence.clear()
+            #
+            #     for (f, t), _ in sequence:
+            #         if t not in self.active_edges[f]:
+            #             self.active_edges[f].append(t)
+            #
+            #     self.update_loads()
+            #     continue
 
-                # self.show([e for e,_ in sequence])
-
-                # self.update_loads(current)
-                # sequence.clear()
-
-                for (f, t), _ in sequence:
-                    if t not in self.active_edges[f]:
-                        self.active_edges[f].append(t)
-
-                self.update_loads()
-                continue
-
-            sequence.append(entry)
+            # sequence.append(entry)
 
             # sequence.append(edge)
 

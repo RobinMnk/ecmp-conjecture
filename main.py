@@ -536,17 +536,17 @@ def check_test_cases(cm):
 
 def custom_instance2():
     neighbors = [
-        [], [0], [0], [1, 2], [3], [0], [0], [0], [5, 6, 7], [8], [8], [8], [8], [3]
+        [], [0], [0], [0], [0], [0], [1, 2, 3, 4, 5]
     ]
 
     parents = make_parents(neighbors)
     dag = DAG(len(neighbors), neighbors, parents)
-    sources = [3, 4, 9, 10, 11, 12, 13]
-    demands = [0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+    sources = [6]
+    demands = [0, 0, 0, 0, 0, 0, 3]
     # sources = list(range(1, len(neighbors) + 1))
     # demands = [0] + [1] * (len(neighbors) - 1)
     inst = Instance(dag, sources, 0, demands)
-    save_instance("failures", inst, 7000)
+    save_instance("failures", inst, 7012)
     show_graph(inst, "_tricky")
 
 
@@ -650,7 +650,7 @@ if __name__ == '__main__':
 
     # create_large_instances(10)
 
-    check_test_cases(cm)
+    # check_test_cases(cm)
 
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
     # inspect_instance(1, "failures")
