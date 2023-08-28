@@ -550,72 +550,6 @@ def custom_instance2():
     show_graph(inst, "_tricky")
 
 
-def lprec(s, i):
-    if i == len(s):
-        print(" ".join(s))
-    elif s[i] == '?':
-        s[i] = '0'
-        lprec(s, i+1)
-        s[i] = '1'
-        lprec(s, i+1)
-        s[i] = "?"
-    else:
-        lprec(s, i+1)
-
-def lprec2(s, i):
-    if i == len(s):
-        print(" ".join(s))
-        return
-    elif s[i] == '?':
-        s1 = [x for x in s]
-        s1[i] = "0"
-        lp(s1)
-        s2 = [x for x in s]
-        s2[i] = "1"
-        lp(s2)
-    else:
-        lprec(s, i + 1)
-
-def lpit(s):
-    comp = True
-    for i, c in enumerate(s):
-        if c == "?":
-            s1 = [x for x in s]
-            s1[i] = "0"
-            lpit(s1)
-
-            s2 = [x for x in s]
-            s2[i] = "1"
-            lpit(s2)
-
-            # s[i] = "1"
-            # lpit(s)
-            # s[i] = "?"
-            comp = False
-            return
-            # break
-    if comp:
-        print(" ".join(s))
-
-
-def fail(s):
-    if not s:
-        print()
-        return
-
-    if s[0] == "?":
-        print(1, end="")
-        fail(s[1:])
-        print(0, end="")
-        fail(s[1:])
-    else:
-        print(s[0], end="")
-        fail(s[1:])
-
-
-def lp(s):
-    fail(list(s))
-
 def create_large_instances(num):
     ig = InstanceGenerator(1000, False, force_size=True)
     successes = 0
@@ -650,11 +584,11 @@ if __name__ == '__main__':
 
     # create_large_instances(10)
 
-    # check_test_cases(cm)
+    check_test_cases(cm)
+    # inspect_instance(570, "failures")
 
     # inspect_instance(1, error_folder(MAIN_CONJECTURE))
-    # inspect_instance(1, "failures")
-    # inspect_instance(6689, "tricky")
+    # inspect_instance(570, "tricky")
     # inspect_instance(1, "tmp")
     # run_single_test_suite(ig, cm, 5000)
 
